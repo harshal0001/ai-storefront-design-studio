@@ -9,9 +9,6 @@ Built with [Strands Agents](https://strandsagents.com/) on Amazon Bedrock, a Fas
 React/Vite frontend, DynamoDB for persistence, and deployable to
 [Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/) via AWS CDK.
 
-> This repository is a prototype built during a short prototyping engagement. Account IDs,
-> hostnames and organisation names have been replaced with placeholders.
-
 ## What it does
 
 - **Guided design conversation** — discovers the business type → asks about the desired vibe →
