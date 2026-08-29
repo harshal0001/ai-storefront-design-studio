@@ -175,7 +175,3 @@ accounts. See [`infra/README.md`](infra/README.md).
 | `docs/04-guardrails.md` | Guardrails and constraints |
 | `DDB_Schema.md` | DynamoDB data model |
 | `design_studio/README.md` | API reference, agent tools, troubleshooting |
-
-## License
-
-No license has been granted for this code. It is published for reference and portfolio purposes.
