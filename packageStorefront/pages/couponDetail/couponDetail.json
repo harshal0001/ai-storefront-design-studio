@@ -1,0 +1,8 @@
+{
+  "usingComponents": {
+    "ant-page": "antd-mini/es/PageContainer/index",
+    "coupon": "/components/coupon/coupon",
+    "page-error": "/components/pageError/pageError"
+  },
+  "styleIsolation": "apply-shared"
+}

@@ -1,0 +1,13 @@
+{
+  "transparentTitle": "auto",
+  "usingComponents": {
+    "ant-page": "antd-mini/es/PageContainer/index",
+    "swiper-dots": "/components/swiper-dots/swiper-dots",
+    "coupon": "/components/coupon/coupon",
+    "market-head": "/components/market-head/market-head",
+    "product": "/components/product/product",
+    "consent-drawer": "/components/consentDrawer/consentDrawer",
+    "page-error": "/components/pageError/pageError"
+  },
+  "styleIsolation": "apply-shared"
+}

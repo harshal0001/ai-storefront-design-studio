@@ -1,0 +1,53 @@
+[project]
+name = "storefront-design-agent"
+version = "0.1.0"
+description = "Conversational storefront customization agent for merchants"
+requires-python = ">=3.12"
+dependencies = [
+    "strands-agents>=1.8.0",
+    "strands-agents-tools>=0.2.7",
+    "boto3>=1.40.0",
+    "bedrock-agentcore>=0.1.0",
+    "coloraide>=8.8.1",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.34.0",
+    "pillow>=10.0.0",
+    "botocore>=1.42.97",
+]
+
+[project.optional-dependencies]
+# AgentCore Runtime container extras. bedrock-agentcore is in base deps so local
+# design-server can use memory hooks without installing the runtime extra.
+runtime = [
+    "aws-opentelemetry-distro==0.12.2",
+    "aws-lambda-powertools>=3.0.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "aws-lambda-powertools[tracer]>=3.0.0",
+    "aws-xray-sdk>=2.14.0",
+]
+screenshot = [
+    "playwright>=1.49.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra --strict-markers"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[project.scripts]
+design-studio = "conversational_agent.main:main"
+design-server = "conversational_agent.server:run_server"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["conversational_agent"]

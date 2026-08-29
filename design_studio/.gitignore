@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+*.egg
+dist/
+build/
+
+# Generated config (runtime state — JSON fallback is test-only via DESIGN_STUDIO_DATA_DIR)
+storefront_config.json
+storefront_tokens_*.json
+storefront_history_*.json
+storefront_zone_tour_*.json
+
+# Node.js / Frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
+# CDK
+cdk/cdk.out/
+cdk/dist/
+cdk/*.tsbuildinfo
+
+# Lock files (optional - some prefer to commit these)
+# uv.lock
+# package-lock.json
+# yarn.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

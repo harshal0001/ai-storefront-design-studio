@@ -1,0 +1,29 @@
+# Build context = design_studio/. Keep it lean.
+.git
+.gitignore
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Runtime state, not deployment artifact
+**/storefront_config.json
+
+# Frontend assets are not part of the agent runtime
+frontend/
+
+# CDK app — not needed in the container
+cdk/
+
+# Docs / IDE / OS
+*.md
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log

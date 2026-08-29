@@ -1,0 +1,3369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Storefront — Reference Template</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+
+<!--
+  ============================================================================
+  Storefront reference template
+  ----------------------------------------------------------------------------
+  This is a port of packageStorefront/pages/home/home.axml + home.acss into
+  vanilla HTML / CSS / JS. Drop in a real `storeInfo` payload and it renders.
+
+  Conventions:
+    * Sections mirror the original AXML structure 1:1, in source order.
+    * Class names use `sf-` prefix so they don't collide with your own CSS.
+    * CSS custom properties live in `:root` — re-skin the page by overriding
+      those, not by hunting through rules.
+    * `rpx` units from the mini program have been converted: 1rpx ≈ 0.5px at
+      a 750px reference width. We use rem-based scaling so the page still
+      adapts on real devices (see `html { font-size }` rule).
+    * All `my.*` Alipay APIs are replaced with web-native equivalents:
+        my.navigateTo        -> <a href>
+        my.makePhoneCall     -> <a href="tel:">
+        my.setClipboard      -> navigator.clipboard.writeText
+        my.showToast         -> showToast() helper at the bottom
+        my.getLocation       -> navigator.geolocation (not used here)
+    * The mock `storeInfo` at the bottom of the file matches the shape the
+      original `getStoreInfo({ uuid, type: 'BASIC' })` returns. Replace it
+      with a real fetch when you wire up a backend.
+  ============================================================================
+-->
+
+<style>
+  /* --------------------------------------------------------------------------
+     1. Design tokens
+     Override these to re-theme. The pink and grey ramp comes straight from the
+     original .acss (#B63F81 primary, #5F6E7D secondary, #070607 ink, etc).
+     -------------------------------------------------------------------------- */
+  :root {
+    /* Brand */
+    --sf-color-primary: #B63F81;
+    --sf-color-ink: #070607;
+    --sf-color-ink-soft: #121217;
+    --sf-color-text: #090809;
+    --sf-color-text-muted: #5F6E7D;
+    --sf-color-text-quiet: #999;
+    --sf-color-border: #E0E5ED;
+    --sf-color-surface: #ffffff;
+    --sf-color-page: #F4F6F9;
+    --sf-color-danger: #D72F4D;
+    --sf-color-warn: #C34F03;
+    --sf-color-success: #0A600A;
+
+    /* Type */
+    --sf-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    "Helvetica Neue", Arial, sans-serif;
+    --sf-font-display: "Montserrat", var(--sf-font-sans);
+
+    /* Geometry */
+    --sf-radius-sm: 6px;
+    --sf-radius-md: 10px;
+    --sf-radius-lg: 20px;
+    --sf-radius-pill: 999px;
+
+    /* Page width — the original is 750rpx wide (~375 logical px on phones).
+       Lock the template to a phone-frame width so it reads correctly on
+       desktop preview. Remove `max-width` if you want it edge-to-edge. */
+    --sf-page-width: 420px;
+  }
+
+  /* Reset, light touch */
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html {
+    font-family: var(--sf-font-sans);
+    color: var(--sf-color-text);
+    background: #ddd; /* page chrome behind the phone-frame */
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  img { display: block; max-width: 100%; }
+  button { font: inherit; cursor: pointer; }
+  a { color: inherit; text-decoration: none; }
+
+  /* Phone-frame container so the layout reads correctly on desktop */
+  .sf-frame {
+    width: 100%;
+    max-width: var(--sf-page-width);
+    background: var(--sf-color-surface);
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* --------------------------------------------------------------------------
+     2. Banner + logo
+     Original: <swiper> of banner images, with a circular logo centered below.
+     We render the first banner statically; see notes/banner-rotator below to
+     wire up a real carousel if you need one.
+     -------------------------------------------------------------------------- */
+  .sf-banner {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 750 / 476;
+    background: #ddd;
+    overflow: hidden;
+  }
+  .sf-banner__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .sf-banner__logo-wrap {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 91px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sf-banner__logo {
+    width: 71px;
+    height: 71px;
+    border-radius: 50%;
+    background: #fff;
+    object-fit: cover;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  }
+
+  /* --------------------------------------------------------------------------
+     3. Store info block — name, intro, tags, contact, address, hours
+     Original is collapsible: tapping the chevron toggles `info-collapsed`,
+     which clips the content height to 0. We use <details>/<summary> for the
+     same effect with zero JS.
+     -------------------------------------------------------------------------- */
+  .sf-info {
+    padding: 20px 20px 0;
+  }
+  .sf-info__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--sf-color-text);
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+  .sf-info__head::-webkit-details-marker { display: none; }
+  .sf-info__chevron {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    transition: transform 0.2s ease;
+  }
+  details[open] > .sf-info__head > .sf-info__chevron {
+    transform: rotate(180deg);
+  }
+  .sf-info__body {
+    padding-top: 16px;
+  }
+
+  .sf-description {
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--sf-color-text-muted);
+    margin: 0 0 16px;
+  }
+
+  /* Tag pills — three flavours from the original CSS:
+     .store-label             — outlined grey (default)
+     .store-label-primary     — outlined pink (categoryType === 'primary')
+     .store-label-category    — solid black (categoryType === 'category')
+     `business.sjs.backLabelTypeClass(tag.categoryType)` picked the right one. */
+  .sf-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 16px;
+  }
+  .sf-tag {
+    border: 1px solid var(--sf-color-text-muted);
+    color: var(--sf-color-text-muted);
+    padding: 4px 12px;
+    border-radius: var(--sf-radius-pill);
+    font-size: 12px;
+    line-height: 1.4;
+    background: transparent;
+  }
+  .sf-tag--primary {
+    border-color: var(--sf-color-primary);
+    color: var(--sf-color-primary);
+  }
+  .sf-tag--category {
+    background: var(--sf-color-ink);
+    border-color: var(--sf-color-ink);
+    color: #fff;
+    border-radius: var(--sf-radius-sm);
+    font-weight: 500;
+  }
+
+  /* Phone / email circle buttons */
+  .sf-contact-row {
+    display: flex;
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+  .sf-contact-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1px solid var(--sf-color-border);
+    background: var(--sf-color-surface);
+    color: var(--sf-color-text-muted);
+    display: grid;
+    place-items: center;
+  }
+  .sf-contact-btn:hover { border-color: var(--sf-color-text-muted); }
+  .sf-contact-btn svg { width: 22px; height: 22px; }
+
+  /* Address row — taps copy to clipboard in the original */
+  .sf-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 0;
+    border-top: 1px solid var(--sf-color-border);
+  }
+  .sf-row__icon {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    color: var(--sf-color-text-muted);
+  }
+  .sf-row__icon svg { width: 100%; height: 100%; }
+  .sf-row__text { flex: 1; font-size: 14px; }
+  .sf-row__chevron {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    color: var(--sf-color-text-muted);
+    transition: transform 0.2s ease;
+  }
+
+  /* Hours block — split into "THIS WEEK" / "NEXT WEEK" by backBusinessHourList
+     in the original. Hours are themselves collapsible. */
+  .sf-hours {
+    padding-left: 36px;  /* aligns with the row text, past the icon */
+    padding-bottom: 16px;
+    display: grid;
+    gap: 6px;
+  }
+  .sf-hours__group-label {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sf-color-text-quiet);
+    margin-top: 8px;
+  }
+  .sf-hours__group-label:first-child { margin-top: 0; }
+  .sf-hours__row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .sf-hours__day { color: var(--sf-color-ink-soft); width: 48px; flex: none; }
+  .sf-hours__times {
+    flex: 1;
+    text-align: right;
+    color: var(--sf-color-text-muted);
+    display: grid;
+    gap: 2px;
+  }
+
+  /* --------------------------------------------------------------------------
+     4. Follow CTA — primary pink pill, full width
+     Original only renders this when storeInfo.exclusiveDealsFlag === 0
+     (i.e. the user has not yet added the shop to their world). We render it
+     unconditionally and gate visibility via a `data-followed` attribute on
+     the frame; flip that to "true" and the button disappears.
+     -------------------------------------------------------------------------- */
+  .sf-follow {
+    padding: 20px 24px;
+    background: var(--sf-color-surface);
+  }
+  .sf-frame[data-followed="true"] .sf-follow { display: none; }
+  .sf-follow__btn {
+    width: 100%;
+    height: 44px;
+    border-radius: var(--sf-radius-pill);
+    border: none;
+    background: var(--sf-color-primary);
+    color: #fff;
+    font-weight: 500;
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .sf-follow__btn:hover { filter: brightness(1.05); }
+  .sf-follow__btn:active { filter: brightness(0.95); }
+
+  /* --------------------------------------------------------------------------
+     5. Marketing area — sits in a grey panel with rounded top corners
+     Holds: (a) a single ad row, (b) Offers section, (c) Products section.
+     The "safe area" padding-bottom in the original is for the iOS home
+     indicator; on the web we use env(safe-area-inset-bottom).
+     -------------------------------------------------------------------------- */
+  .sf-market {
+    background: var(--sf-color-page);
+    border-radius: var(--sf-radius-lg) var(--sf-radius-lg) 0 0;
+    padding: 20px 0 calc(60px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Ad strip — defaultAd from i18n, used as a welcome banner */
+  .sf-ads { padding: 0 20px 17px; }
+  .sf-ad {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--sf-color-surface);
+    border-radius: var(--sf-radius-md);
+    padding: 10px;
+    min-height: 55px;
+  }
+  .sf-ad__logo {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #eee;
+    object-fit: cover;
+  }
+  .sf-ad__text {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.3;
+    color: rgba(0,0,0,.55);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Section header used by Offers and Products */
+  .sf-section-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    font-family: var(--sf-font-display);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sf-color-ink);
+  }
+  .sf-section-head__icon { width: 18px; height: 18px; }
+
+  /* --------------------------------------------------------------------------
+     6. Coupon card
+     A horizontally-split card: pink left side with the discount amount,
+     white right side with the name, threshold, validity, and a CTA button.
+     The decorative "sawtooth" edge between halves is a CSS radial-gradient.
+     viewStatus drives the badge in the top-right and the button label:
+       uncollected      -> "GET IT"
+       availableForUse  -> "USE"
+       used / expired   -> badge only, button hidden, card dimmed
+       invalidForOrder  -> button disabled with reason text
+     -------------------------------------------------------------------------- */
+  .sf-coupon-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 6px 20px 16px;
+  }
+  .sf-coupon {
+    position: relative;
+    display: flex;
+    height: 150px;
+    border-radius: var(--sf-radius-lg);
+    overflow: hidden;
+    background: var(--sf-color-surface);
+    border: 1px solid var(--sf-color-border);
+  }
+  .sf-coupon[data-status="used"],
+  .sf-coupon[data-status="expired"] {
+    opacity: 0.4;
+  }
+
+  /* Status badge — diagonal pink ribbon along the top edge */
+  .sf-coupon__status {
+    position: absolute;
+    top: 8px;
+    right: 14px;
+    z-index: 2;
+    font-family: var(--sf-font-display);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #fff;
+    padding: 4px 10px;
+    background: var(--sf-color-primary);
+    border-radius: var(--sf-radius-sm);
+  }
+
+  /* Pink left side */
+  .sf-coupon__cover {
+    flex: none;
+    width: 158px;
+    background:
+      linear-gradient(135deg, var(--sf-color-primary), #8d2864);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    position: relative;
+  }
+  .sf-coupon__cover-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.35;
+  }
+  .sf-coupon__amount {
+    position: relative;
+    z-index: 1;
+    font-family: var(--sf-font-display);
+    font-weight: 600;
+    line-height: 1;
+    text-align: center;
+    /* Original picks size from amount string length via backFonSizeOfAmount;
+       we approximate with clamp() that scales down for long numbers. */
+    font-size: clamp(28px, 11vw, 60px);
+  }
+  .sf-coupon__amount-unit {
+    font-size: 0.66em;
+    margin-left: 2px;
+  }
+
+  /* The sawtooth divider — punched circles top and bottom between halves */
+  .sf-coupon::before,
+  .sf-coupon::after {
+    content: "";
+    position: absolute;
+    left: 152px;
+    width: 12px;
+    height: 12px;
+    background: #fff;            /* match host page background outside card */
+    border: 1px solid var(--sf-color-border);
+    border-radius: 50%;
+    z-index: 1;
+  }
+  .sf-coupon::before { top: -6px; }
+  .sf-coupon::after { bottom: -6px; }
+
+  /* White right side */
+  .sf-coupon__body {
+    flex: 1;
+    padding: 18px 14px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-width: 0;             /* allow text-overflow to work */
+  }
+  .sf-coupon__name {
+    font-family: var(--sf-font-display);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--sf-color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sf-coupon__threshold {
+    font-size: 13px;
+    color: var(--sf-color-text-muted);
+    margin-top: 2px;
+  }
+  .sf-coupon__valid {
+    font-family: var(--sf-font-display);
+    font-size: 10px;
+    line-height: 1.3;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sf-color-text-muted);
+    margin-top: 6px;
+  }
+  .sf-coupon__valid-range { display: block; letter-spacing: 0; }
+  .sf-coupon__invalid-reason {
+    font-family: var(--sf-font-display);
+    font-size: 9px;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--sf-color-warn);
+    margin-bottom: 4px;
+  }
+  .sf-coupon__actions {
+    border-top: 1px dashed #7F8FAB;
+    padding-top: 8px;
+    margin-top: 8px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  .sf-coupon__btn {
+    background: var(--sf-color-ink);
+    color: #fff;
+    border: none;
+    border-radius: var(--sf-radius-pill);
+    padding: 6px 18px;
+    font-family: var(--sf-font-display);
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .sf-coupon__btn:disabled {
+    background: #919192;
+    cursor: not-allowed;
+  }
+
+  /* --------------------------------------------------------------------------
+     7. Products grid
+     Original chunks products into pairs for a swiper-of-pairs. On the web
+     a simple 2-column CSS grid handles this cleanly; rows just keep going.
+     If you want the swipe-paged behaviour, wrap each pair in a `.sf-products__page`
+     and apply CSS scroll-snap to the container — see notes/swiper.
+     -------------------------------------------------------------------------- */
+  .sf-products {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    padding: 6px 20px 16px;
+  }
+  .sf-product {
+    background: var(--sf-color-surface);
+    border-radius: var(--sf-radius-sm);
+    padding: 6px 6px 14px;
+    display: flex;
+    flex-direction: column;
+    min-height: 260px;
+  }
+  .sf-product__image {
+    width: 100%;
+    aspect-ratio: 320 / 260;
+    object-fit: cover;
+    border-radius: var(--sf-radius-sm);
+    background: #eee;
+  }
+  .sf-product__name {
+    font-family: var(--sf-font-display);
+    font-weight: 600;
+    font-size: 12px;
+    line-height: 1.25;
+    color: #3B3B4D;
+    padding: 16px 8px 0;
+    flex: 1;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .sf-product__labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 8px 0;
+  }
+  .sf-product__label {
+    border: 1px solid var(--sf-color-text-muted);
+    color: var(--sf-color-text-muted);
+    border-radius: var(--sf-radius-pill);
+    padding: 1px 8px;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+  .sf-product__prices {
+    padding: 12px 8px 0;
+    font-family: var(--sf-font-display);
+    font-weight: 600;
+    line-height: 1;
+  }
+  .sf-product__price {
+    font-size: 22px;
+    color: var(--sf-color-text-muted);
+  }
+  .sf-product__price-original {
+    font-size: 14px;
+    color: var(--sf-color-danger);
+    text-decoration: line-through;
+    margin-left: 6px;
+  }
+  .sf-product__from {
+    padding: 8px 8px 0;
+    font-family: var(--sf-font-display);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--sf-color-text-muted);
+  }
+  .sf-product__from-price {
+    margin-left: 6px;
+    font-size: 22px;
+  }
+
+  /* --------------------------------------------------------------------------
+     8. Toast — replaces my.showToast
+     -------------------------------------------------------------------------- */
+  .sf-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 80px;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(0,0,0,0.82);
+    color: #fff;
+    font-size: 14px;
+    padding: 10px 18px;
+    border-radius: var(--sf-radius-sm);
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    z-index: 9999;
+    max-width: 80%;
+    text-align: center;
+  }
+  .sf-toast.is-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* --------------------------------------------------------------------------
+     9. Netlify storefront visual skin
+     Keeps the reference-template structure and render API intact while matching
+     the richer mockup treatment used by netlify-storefront.html.
+     -------------------------------------------------------------------------- */
+  :root {
+    --color-pink:        #B63F81;
+    --color-pink-dark:   #9E3570;
+    --color-white:       #FFFFFF;
+    --color-bg-subtle:   #F4F6F9;
+    --color-bg-page:     #F8F9FA;
+    --color-border:      #DFE5EE;
+    --color-border-soft: #EEF1F5;
+    --color-border-dash: #C8D3E0;
+    --color-text-dark:   #3B3B4D;
+    --color-text-mid:    #5F6E7D;
+    --color-text-light:  #8A9BB0;
+    --color-cta:         #2C2C2C;
+    --radius-sm:   8px;
+    --radius-md:   12px;
+    --radius-lg:   16px;
+    --radius-full: 999px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+    --shadow-xl: 0 12px 40px rgba(0,0,0,0.16);
+    --font-sans: 'Montserrat', sans-serif;
+    --font-body: 'Roboto', sans-serif;
+
+    --sf-color-primary: var(--color-pink);
+    --sf-color-ink: var(--color-cta);
+    --sf-color-ink-soft: var(--color-text-dark);
+    --sf-color-text: var(--color-text-dark);
+    --sf-color-text-muted: var(--color-text-mid);
+    --sf-color-text-quiet: var(--color-text-light);
+    --sf-color-border: var(--color-border-soft);
+    --sf-color-surface: var(--color-white);
+    --sf-color-page: var(--color-bg-page);
+    --sf-font-sans: var(--font-body);
+    --sf-font-display: var(--font-sans);
+    --sf-radius-sm: var(--radius-sm);
+    --sf-radius-md: var(--radius-md);
+    --sf-radius-lg: var(--radius-lg);
+    --sf-radius-pill: var(--radius-full);
+    --sf-page-width: 390px;
+  }
+
+  html {
+    background: #F1F3F5;
+  }
+
+  body {
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 40px;
+    background: #F1F3F5;
+    color: var(--color-text-dark);
+    font-family: var(--font-body);
+  }
+
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .sf-frame {
+    position: relative;
+    width: 390px;
+    max-width: 390px;
+    height: 844px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 40px;
+    background: var(--color-bg-page);
+    box-shadow: var(--shadow-xl), inset 0 0 0 1px rgba(0,0,0,0.08);
+  }
+  .sf-frame__scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+  }
+  .sf-frame__scroll::-webkit-scrollbar { width: 0; height: 0; }
+
+  .sf-frame::before {
+    content: "";
+    position: sticky;
+    top: 0;
+    left: 50%;
+    display: block;
+    width: 160px;
+    height: 34px;
+    margin: 0 auto -34px;
+    border-radius: 0 0 20px 20px;
+    background: #000;
+    z-index: 100;
+  }
+
+  .sf-banner {
+    position: relative;
+    z-index: 2;
+    overflow: visible;
+    background: var(--color-white);
+    aspect-ratio: auto;
+    height: auto;
+  }
+  .sf-banner__media {
+    position: relative;
+    height: 244px;
+    overflow: hidden;
+    background: #2C2C2C;
+    border-radius: 0 0 0 110px;
+  }
+  .sf-banner__media::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      rgba(0,0,0,0) 0%,
+      rgba(0,0,0,0.06) 60%,
+      rgba(0,0,0,0.22) 100%
+    );
+    pointer-events: none;
+  }
+  .sf-banner__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .sf-info {
+    position: relative;
+    margin: 0;
+    padding: 0;
+    background: var(--color-white);
+  }
+  .sf-info__head {
+    align-items: flex-start;
+    gap: 8px;
+    padding: 28px 118px 0 18px;
+    font-family: var(--font-sans);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-text-dark);
+  }
+  .sf-info__head span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sf-info__chevron {
+    width: 18px;
+    height: 18px;
+    color: var(--color-border-dash);
+  }
+  .sf-info__body {
+    padding: 0;
+    margin: 0;
+    width: 100%;
+  }
+
+  .sf-description {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 300;
+    line-height: 20px;
+    color: var(--color-text-mid);
+    margin: 0 0 14px;
+  }
+
+  .sf-tags {
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin: 0 -18px 16px 0;
+    padding: 4px 0 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .sf-tags::-webkit-scrollbar { display: none; }
+  .sf-tag {
+    flex: none;
+    padding: 6px 14px;
+    border: 1.5px solid var(--color-border-dash);
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--color-text-mid);
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+  }
+  .sf-tag--primary {
+    border-color: rgba(182,63,129,0.45);
+    color: var(--color-pink);
+  }
+  .sf-tag--category {
+    border-color: var(--color-cta);
+    border-radius: var(--radius-full);
+    background: var(--color-cta);
+    color: var(--color-white);
+  }
+
+  .sf-contact-row {
+    gap: 8px;
+    padding: 0 0 12px;
+  }
+  .sf-contact-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border-soft);
+    background: var(--color-bg-subtle);
+    color: var(--color-text-mid);
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .sf-contact-btn:hover {
+    border-color: var(--color-pink);
+    color: var(--color-pink);
+  }
+  .sf-contact-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .sf-row {
+    align-items: flex-start;
+    gap: 14px;
+    padding: 13px 0 !important;
+    border-top: 1px solid var(--color-border-soft) !important;
+    color: var(--color-text-dark);
+    text-decoration: none;
+  }
+  .sf-row__icon {
+    width: 22px;
+    height: 22px;
+    padding-top: 2px;
+    color: var(--color-text-light);
+  }
+  .sf-row__icon svg {
+    width: 17px;
+    height: 17px;
+  }
+  .sf-row__text {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--color-text-dark);
+  }
+  .sf-row__text strong {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    color: var(--color-text-dark);
+  }
+  .sf-row__chevron {
+    width: 16px;
+    height: 16px;
+    color: var(--color-border-dash);
+    align-self: center;
+  }
+  .sf-hours {
+    margin-top: 6px;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-subtle);
+  }
+  .sf-hours__group-label {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: var(--color-text-light);
+  }
+  .sf-hours__row {
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(223,229,238,0.75);
+    font-size: 12px;
+  }
+  .sf-hours__row:last-child { border-bottom: none; }
+  .sf-hours__day {
+    width: 52px;
+    color: var(--color-text-dark);
+    font-family: var(--font-sans);
+    font-weight: 500;
+  }
+  .sf-hours__times {
+    color: var(--color-text-mid);
+    font-family: var(--font-body);
+    font-weight: 400;
+  }
+
+  .sf-follow {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    padding: 16px 20px 28px;
+    border-top: 1px solid #E9ECEF;
+    background: var(--color-white);
+    box-shadow: 0 -6px 30px 0 rgba(59,74,116,0.10);
+  }
+  .sf-follow__btn {
+    height: auto;
+    min-height: 52px;
+    padding: 16px;
+    border-radius: var(--radius-full);
+    background: var(--color-cta);
+    color: var(--color-white);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.4px;
+    box-shadow: none;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .sf-follow__btn:hover {
+    filter: none;
+    background: #1a1a1a;
+    transform: translateY(-1px);
+  }
+
+  .sf-market {
+    padding: 0;
+    border-radius: 0;
+    background: var(--color-bg-page);
+  }
+
+  .sf-ads {
+    padding: 20px 20px 0;
+  }
+  .sf-ad {
+    min-height: 0;
+    padding: 16px;
+    gap: 12px;
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-subtle);
+    box-shadow: none;
+  }
+  .sf-ad__logo {
+    width: 40px;
+    height: 40px;
+  }
+  .sf-ad__text {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 17px;
+    color: var(--color-text-mid);
+  }
+
+  .sf-section-head {
+    justify-content: space-between;
+    padding: 20px 20px 12px;
+    color: var(--color-text-light);
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .sf-section-head__icon {
+    width: 14px;
+    height: 14px;
+    color: var(--color-pink);
+  }
+
+  .sf-coupon-list {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 0 25px 4px;
+    scroll-padding-left: 25px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .sf-coupon-list::-webkit-scrollbar { display: none; }
+  .sf-coupon {
+    flex: 0 0 340px;
+    height: 150px;
+    scroll-snap-align: center;
+    border: none;
+    border-radius: 14px;
+    background: var(--color-cta);
+    box-shadow: var(--shadow-md);
+  }
+  .sf-coupon::before,
+  .sf-coupon::after {
+    display: none;
+  }
+  .sf-coupon__cover {
+    width: 126px;
+    background: linear-gradient(135deg, rgba(182,63,129,0.95), rgba(44,44,44,0.95));
+  }
+  .sf-coupon__cover::before {
+    content: "Offer";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 40px;
+    width: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0 0 20px 0;
+    background: var(--color-pink);
+    color: var(--color-white);
+    font-family: var(--font-sans);
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    z-index: 2;
+  }
+  .sf-coupon__cover-img {
+    opacity: 0.35;
+  }
+  .sf-coupon__amount {
+    font-family: var(--font-sans);
+    font-size: 42px;
+    font-weight: 300;
+    letter-spacing: -1px;
+  }
+  .sf-coupon__amount-unit {
+    font-size: 0.45em;
+    font-weight: 300;
+    vertical-align: super;
+  }
+  .sf-coupon__body {
+    position: relative;
+    z-index: 2;
+    padding: 14px 13px 11px;
+    background: linear-gradient(135deg, rgba(0,0,0,0.72), rgba(0,0,0,0.52));
+    color: var(--color-white);
+  }
+  .sf-coupon__status {
+    top: 11px;
+    right: 13px;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    color: rgba(255,255,255,0.75);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+  .sf-coupon__name {
+    max-width: 150px;
+    color: var(--color-white);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  .sf-coupon__threshold {
+    color: rgba(255,255,255,0.75);
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .sf-coupon__valid,
+  .sf-coupon__valid-range {
+    color: rgba(255,255,255,0.55);
+    font-family: var(--font-sans);
+    font-size: 8px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+  .sf-coupon__actions {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 8px;
+  }
+  .sf-coupon__btn {
+    padding: 8px 16px;
+    border-radius: var(--radius-full);
+    background: rgba(255,255,255,0.95);
+    color: var(--color-text-dark);
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .sf-coupon__btn:disabled {
+    background: rgba(255,255,255,0.5);
+    color: rgba(59,59,77,0.6);
+  }
+
+  .sf-products {
+    gap: 10px;
+    padding: 0 20px 20px;
+  }
+  .sf-product {
+    min-height: 0;
+    overflow: hidden;
+    padding: 0;
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-md);
+    background: var(--color-white);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s;
+  }
+  .sf-product:hover {
+    box-shadow: var(--shadow-md);
+  }
+  .sf-product__image {
+    aspect-ratio: 1 / 1;
+    border-radius: 0;
+  }
+  .sf-product__name {
+    padding: 8px 10px 0;
+    color: var(--color-text-dark);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    display: block;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .sf-product__labels {
+    gap: 4px;
+    padding: 5px 10px 0;
+  }
+  .sf-product__label {
+    padding: 3px 8px;
+    border: 1px solid var(--color-border-dash);
+    color: var(--color-text-light);
+    font-family: var(--font-sans);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .sf-product__prices,
+  .sf-product__from {
+    padding: 8px 10px 10px;
+    color: var(--color-text-dark);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .sf-product__price,
+  .sf-product__from-price {
+    color: var(--color-text-dark);
+    font-size: 13px;
+  }
+  .sf-product__price-original {
+    color: var(--color-text-light);
+    font-size: 11px;
+    font-weight: 400;
+  }
+
+  .sf-toast {
+    bottom: 96px;
+    border-radius: var(--radius-md);
+    font-family: var(--font-body);
+  }
+
+  @media (max-width: 520px) {
+    body {
+      display: block;
+      padding: 0;
+      background: var(--color-bg-page);
+    }
+
+    .sf-frame {
+      width: 100%;
+      max-width: none;
+      min-height: 100vh;
+      height: 100vh;
+      height: 100dvh;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .sf-frame::before {
+      display: none;
+    }
+  }
+  /* ── Netlify layout alignment (visual skin only) ── */
+
+  .sf-hero {
+    position: relative;
+    background: var(--color-white);
+  }
+
+  .sf-banner {
+    position: relative;
+    overflow: visible;
+    background: var(--color-white);
+    aspect-ratio: auto;
+    height: auto;
+  }
+  .sf-banner__media {
+    position: relative;
+    height: 244px;
+    overflow: hidden;
+    background: #2C2C2C;
+    border-radius: 0 0 0 110px;
+  }
+  .sf-banner__media::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.06) 60%, rgba(0,0,0,0.22) 100%);
+    pointer-events: none;
+  }
+  .sf-banner::after { display: none; }
+  .sf-banner__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .sf-banner__actions {
+    position: absolute;
+    top: 48px;
+    left: 16px;
+    right: 16px;
+    display: flex;
+    justify-content: space-between;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .sf-banner__action-group { display: flex; gap: 8px; }
+  .sf-banner__action-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.88);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-sm);
+  }
+  .sf-banner__action-btn svg { width: 18px; height: 18px; color: #343A40; }
+  .sf-banner__dots {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 5px;
+    z-index: 10;
+  }
+  .sf-banner__dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.45);
+  }
+  .sf-banner__dot--active {
+    width: 16px;
+    border-radius: 3px;
+    background: var(--color-white);
+  }
+  .sf-hero .sf-banner__logo-wrap {
+    position: absolute;
+    right: 22px;
+    top: 244px;
+    bottom: auto;
+    left: auto;
+    width: 98px;
+    height: 98px;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--color-white);
+    border: 3px solid var(--color-white);
+    overflow: hidden;
+    z-index: 30;
+    pointer-events: none;
+    box-shadow: var(--shadow-sm);
+  }
+  .sf-hero .sf-banner__logo {
+    width: 80px;
+    height: 80px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    object-fit: contain;
+    pointer-events: auto;
+  }
+
+  .sf-info {
+    position: relative;
+    margin: 0;
+    padding: 0;
+    background: var(--color-white);
+    border: none;
+  }
+  .sf-info__head {
+    display: block;
+    list-style: none;
+    cursor: default;
+    pointer-events: none;
+    padding: 28px 118px 0 18px;
+  }
+  .sf-info__head::-webkit-details-marker,
+  .sf-info__chevron { display: none !important; }
+  .sf-info__hero-left { display: block; min-width: 0; }
+  #sf-name {
+    display: block;
+    font-family: var(--font-sans);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-text-dark);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sf-hero-tagline {
+    position: static !important;
+    transform: none !important;
+    max-width: none;
+    padding: 0;
+    margin-top: 3px;
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 300;
+    line-height: 1.3;
+    color: var(--color-text-mid);
+    text-shadow: none;
+    border-radius: 0;
+  }
+  .sf-hero-tagline:empty { display: none; }
+  .sf-hero-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    pointer-events: auto;
+  }
+  .sf-open-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: var(--radius-full);
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .sf-hero-meta-row:has(#sf-opens-at:not(:empty)) .sf-open-badge {
+    background: rgba(239,68,68,0.10);
+    color: #dc2626;
+  }
+  .sf-hero-meta-row:has(#sf-opens-at:empty) .sf-open-badge {
+    background: rgba(34,197,94,0.12);
+    color: #16a34a;
+  }
+  .sf-open-badge__dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.75;
+  }
+  .sf-hero-hours {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 300;
+    color: var(--color-text-light);
+  }
+  .sf-info__body {
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    pointer-events: auto;
+  }
+  .sf-card-section {
+    margin: 0;
+    padding: 20px;
+    padding-right: 48px;
+    background: var(--color-bg-subtle);
+    border: none;
+    border-radius: 0 80px 0 0;
+    box-sizing: border-box;
+    width: 100%;
+  }
+  .sf-description {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 300;
+    line-height: 20px;
+    color: var(--color-text-mid);
+  }
+  .sf-desc-more { display: none; }
+  .sf-desc-more:checked ~ .sf-description {
+    -webkit-line-clamp: unset;
+    display: block;
+  }
+  .sf-read-more {
+    display: block;
+    background: none;
+    border: none;
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 500;
+    color: #5F6E7D;
+    cursor: pointer;
+    padding: 10px 0 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .sf-desc-more:checked ~ .sf-read-more::after { content: "Read less"; }
+  .sf-read-more::after { content: "Read more"; }
+  .sf-read-more { font-size: 0; }
+  .sf-tags-section {
+    background: var(--color-bg-subtle);
+    padding: 4px 0 16px 20px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .sf-tags {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sf-tags::-webkit-scrollbar { display: none; }
+  .sf-hours-wrap > summary .sf-row__text--hours { display: block; }
+  .sf-hours-wrap > summary .sf-hero-meta-row { display: none !important; }
+
+  .sf-info.sf-info--hero {
+    padding: 0;
+    background: var(--color-white);
+  }
+  .sf-info.sf-info--hero .sf-info__head {
+    padding: 28px 118px 16px 18px;
+  }
+  .sf-store-intro {
+    background: var(--color-white);
+    width: 100%;
+  }
+  .sf-info__body--intro {
+    padding: 0;
+    margin: 0;
+    width: 100%;
+  }
+  .sf-store-details {
+    padding: 0;
+    margin: 0;
+    background: var(--color-white);
+    border-top: none;
+  }
+  .sf-section-head--store {
+    padding-top: 20px;
+    padding-bottom: 4px;
+  }
+  .sf-info__body--details {
+    padding: 0 20px 20px;
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .sf-info-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .sf-info-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    width: 100%;
+    padding: 13px 0;
+    border: none;
+    border-bottom: 1px solid var(--color-border-soft);
+    background: none;
+    text-align: left;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    box-sizing: border-box;
+  }
+  .sf-info-item:last-child {
+    border-bottom: none;
+  }
+  .sf-info-item:hover .sf-info-value {
+    color: var(--color-pink);
+  }
+  .sf-info-item--static {
+    cursor: default;
+  }
+  .sf-info-item--static:hover .sf-info-value {
+    color: var(--color-text-dark);
+  }
+  .sf-info-icon {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+  .sf-info-icon svg {
+    width: 17px;
+    height: 17px;
+    color: var(--color-text-light);
+  }
+  .sf-info-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .sf-info-label {
+    font-family: var(--font-sans);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--color-text-light);
+    margin-bottom: 3px;
+  }
+  .sf-info-value {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--color-text-dark);
+    transition: color 0.2s;
+  }
+  .sf-info-value--link {
+    color: var(--color-pink);
+  }
+  .sf-info-chevron {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    align-self: center;
+    color: var(--color-border-dash);
+  }
+  .sf-social-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 2px;
+  }
+  .sf-social-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-subtle);
+    border: 1px solid var(--color-border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .sf-social-btn:hover {
+    border-color: var(--color-pink);
+  }
+  .sf-social-btn svg {
+    width: 15px;
+    height: 15px;
+    color: var(--color-text-mid);
+  }
+  .sf-hours-section {
+    padding: 20px;
+    background: var(--color-white);
+    border-top: 1px solid var(--color-border-soft);
+  }
+  .sf-hours-section .sf-section-head {
+    padding: 0 0 12px;
+  }
+  .sf-hours-section .sf-hours {
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  /* Our Products — horizontal showcase carousel (netlify section 3) */
+  .sf-showcase-block {
+    background: var(--color-white);
+    border-top: 1px solid var(--color-border-soft);
+    padding-bottom: 4px;
+  }
+  .sf-section-head--showcase {
+    padding-bottom: 4px;
+  }
+  .sf-showcase {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 10px calc(50% - 105px) 4px;
+    scroll-padding-left: calc(50% - 105px);
+    margin: 12px -20px 0;
+    cursor: grab;
+  }
+  .sf-showcase::-webkit-scrollbar { display: none; }
+  .sf-showcase.is-dragging {
+    cursor: grabbing;
+    scroll-snap-type: none;
+  }
+  .sf-showcase-card {
+    position: relative;
+    flex-shrink: 0;
+    scroll-snap-align: center;
+    width: 210px;
+    height: 295px;
+    border-radius: 22px;
+    overflow: hidden;
+    background: var(--color-white);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
+    transition: transform 0.22s ease, opacity 0.22s ease, box-shadow 0.3s ease;
+    transform-origin: center center;
+    user-select: none;
+  }
+  .sf-showcase-card__media {
+    position: absolute;
+    inset: 0;
+  }
+  .sf-showcase-card__media::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.05) 40%,
+      rgba(0, 0, 0, 0.68) 100%
+    );
+    z-index: 1;
+  }
+  .sf-showcase-card__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .sf-showcase-card__body {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 14px;
+    z-index: 3;
+  }
+  .sf-showcase-card__category {
+    font-family: var(--font-sans);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.72);
+    margin-bottom: 4px;
+  }
+  .sf-showcase-card__name {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #fff;
+    margin-bottom: 10px;
+  }
+  .sf-showcase-card__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .sf-showcase-card__price {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .sf-showcase-card__price-original {
+    font-size: 11px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.6);
+    text-decoration: line-through;
+    margin-left: 4px;
+  }
+  .sf-showcase-card__add {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .sf-showcase-card__add:hover {
+    background: var(--color-pink);
+    transform: scale(1.08);
+  }
+  .sf-showcase-card__add svg {
+    width: 13px;
+    height: 13px;
+    color: var(--color-text-dark);
+  }
+  .sf-showcase-card__add:hover svg {
+    color: #fff;
+  }
+  .sf-showcase-dots {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    padding: 10px 0 2px;
+  }
+  .sf-showcase-dots:empty { display: none; }
+  .sf-showcase-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--color-border-dash);
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+  .sf-showcase-dot.active {
+    width: 16px;
+    border-radius: 3px;
+    background: var(--color-text-dark);
+  }
+
+  .sf-products-block {
+    background: var(--color-white);
+    padding-bottom: 0;
+  }
+  .sf-section-head--products {
+    padding-bottom: 4px;
+  }
+  .sf-product-filters {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -20px;
+    padding: 0 20px 12px;
+  }
+  .sf-product-filters:empty,
+  .sf-product-filters.is-hidden {
+    display: none;
+  }
+  .sf-product-filters::-webkit-scrollbar { display: none; }
+  .sf-product-filter {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    border: 1px solid var(--color-border-soft);
+    background: transparent;
+    color: var(--color-text-mid);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .sf-product-filter.is-active {
+    font-weight: 700;
+    border-color: var(--color-text-dark);
+    background: var(--color-text-dark);
+    color: #fff;
+  }
+  .sf-products {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 0 20px 12px;
+  }
+  .sf-product {
+    position: relative;
+    cursor: pointer;
+  }
+  .sf-product__media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+  }
+  .sf-product__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: 0;
+    background: var(--color-bg-subtle);
+  }
+  .sf-product__heart {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(4px);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+    padding: 0;
+  }
+  .sf-product__heart svg {
+    width: 14px;
+    height: 14px;
+    color: #c8d3e0;
+    transition: color 0.2s, fill 0.2s;
+  }
+  .sf-product__heart.is-liked svg {
+    color: var(--color-pink);
+    fill: var(--color-pink);
+  }
+  .sf-product__body {
+    padding: 8px 10px 10px;
+  }
+  .sf-product__name {
+    padding: 0;
+    margin: 0;
+    flex: none;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    -webkit-box-orient: unset;
+  }
+  .sf-product__desc {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 300;
+    line-height: 1.3;
+    color: var(--color-text-light);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sf-product__desc:empty { display: none; }
+  .sf-products-block .sf-product__labels { display: none; }
+  .sf-product__prices,
+  .sf-product__from {
+    padding: 0;
+    margin-top: 5px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .sf-product__from {
+    display: block;
+  }
+  .sf-product__from > span:first-child {
+    font-weight: 400;
+    text-transform: lowercase;
+    margin-right: 4px;
+  }
+  .sf-products-catalogue {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: calc(100% - 40px);
+    margin: 0 20px 16px;
+    padding: 11px;
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-full);
+    background: var(--color-white);
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--color-text-mid);
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .sf-products-catalogue:hover {
+    border-color: var(--color-pink);
+    color: var(--color-pink);
+  }
+  .sf-products-catalogue svg {
+    width: 14px;
+    height: 14px;
+  }
+  .sf-directions {
+    position: relative;
+    flex-shrink: 0;
+    z-index: 25;
+    background: var(--color-white);
+    padding: 16px 20px 28px;
+    border-top: 1px solid var(--color-border-soft);
+    box-shadow: 0 -6px 30px rgba(59, 74, 116, 0.10);
+  }
+  .sf-directions__btn {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: var(--radius-full);
+    background: var(--color-cta);
+    color: var(--color-white);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .sf-directions__btn:hover {
+    background: var(--color-cta);
+    filter: brightness(0.92);
+    transform: translateY(-1px);
+  }
+  .sf-directions__btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  .sf-frame {
+    padding-bottom: 0;
+  }
+  .sf-spacer-bottom {
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .sf-market {
+    padding-bottom: 0;
+  }
+
+  /* Follow FAB — fixed on right, floats above scroll content (netlify fab-wrapper) */
+  .sf-follow {
+    position: absolute;
+    right: 20px;
+    bottom: 108px;
+    z-index: 40;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-end;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .sf-follow__btn {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: 56px;
+    min-height: 56px;
+    height: 56px;
+    padding: 0;
+    border-radius: 50%;
+    border: none;
+    background: var(--color-pink) !important;
+    color: transparent !important;
+    font-size: 0;
+    letter-spacing: 0;
+    box-shadow: 0 6px 16px rgba(182, 63, 129, 0.35);
+    pointer-events: all;
+    overflow: hidden;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .sf-follow__btn::before {
+    content: "Follow and never miss an offer";
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 15px;
+    text-transform: uppercase;
+    opacity: 0;
+    max-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: opacity 0.3s ease 0.2s, max-width 0.3s ease 0.2s;
+  }
+  .sf-follow__btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+  }
+  .sf-follow__btn-icon svg {
+    width: 22px;
+    height: 22px;
+    color: #fff;
+    stroke: currentColor;
+    transition: fill 0.2s, color 0.2s;
+  }
+  .sf-follow__btn:hover,
+  .sf-follow__btn:focus-visible {
+    background: var(--color-pink) !important;
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+  }
+  .sf-follow__btn:hover::before,
+  .sf-follow__btn:focus-visible::before {
+    opacity: 0;
+    max-width: 0;
+  }
+
+  .sf-market {
+    background: var(--color-bg-page);
+    border-radius: 0;
+    padding-bottom: 0;
+  }
+  .sf-ads { display: none; }
+
+  .sf-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 20px 12px;
+    margin: 0;
+    font-size: 0;
+    gap: 0;
+  }
+  .sf-section-head__icon { display: none; }
+  .sf-section-head__label {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--color-text-light);
+  }
+  .sf-section-head__link {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--color-pink);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .sf-section-head__link svg { width: 12px; height: 12px; }
+
+  .sf-offers-block {
+    background: var(--color-bg-page);
+    padding-bottom: 8px;
+  }
+  .sf-offer-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 0 4px;
+  }
+  .sf-offer-dots:empty { display: none; }
+  .sf-offer-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-border-dash);
+  }
+  .sf-offer-dot.active {
+    width: 18px;
+    border-radius: 3px;
+    background: var(--color-pink);
+  }
+
+  .sf-coupon {
+    position: relative;
+    display: flex;
+    flex: 0 0 340px;
+    height: 150px;
+    border: none;
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--color-cta);
+    box-shadow: var(--shadow-md);
+  }
+  .sf-coupon__cover {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .sf-coupon__cover::before {
+    bottom: 0;
+    height: auto;
+    width: 20px;
+    border-radius: 0 0 20px 0;
+  }
+  .sf-coupon__cover-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 1;
+  }
+  .sf-coupon__amount {
+    position: absolute;
+    top: 11px;
+    right: 13px;
+    left: auto;
+    z-index: 3;
+    font-size: 34px;
+    font-weight: 300;
+    text-align: right;
+    transform: none;
+  }
+  .sf-coupon__amount-unit { font-size: 15px; vertical-align: super; }
+  .sf-coupon__body {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 11px 13px 11px 30px;
+    background: linear-gradient(135deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.52) 60%, rgba(0,0,0,0.72) 100%);
+  }
+  .sf-coupon__status {
+    top: auto;
+    bottom: 11px;
+    right: 13px;
+    font-size: 8px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .sf-coupon__name {
+    max-width: none;
+    font-size: 14px;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .sf-coupon__threshold {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.75);
+    margin-top: 3px;
+  }
+  .sf-coupon__valid,
+  .sf-coupon__valid-range {
+    font-size: 8px;
+    color: rgba(255,255,255,0.55);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .sf-coupon__actions {
+    position: absolute;
+    right: 13px;
+    bottom: 36px;
+    margin: 0;
+    border: none;
+    padding: 0;
+  }
+  .sf-coupon__btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--color-pink);
+    color: transparent;
+    font-size: 0;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(182,63,129,0.4);
+  }
+
+  .sf-product__image {
+    position: relative;
+  }
+  .sf-product__image::after {
+    content: "";
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.88) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23C8D3E0' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z'/%3E%3C/svg%3E") center/14px no-repeat;
+    box-shadow: var(--shadow-sm);
+    pointer-events: none;
+  }
+
+  .sf-frame[data-logo-placement="left"] .sf-hero .sf-banner__logo-wrap {
+    left: 20px;
+    right: auto;
+    top: 244px;
+    transform: translateY(-50%);
+  }
+  .sf-frame[data-logo-placement="center"] .sf-hero .sf-banner__logo-wrap {
+    left: 50%;
+    right: auto;
+    top: 244px;
+    transform: translate(-50%, -50%);
+  }
+  .sf-frame[data-hero-overlay="lightScrim"] .sf-banner__media::after,
+  .sf-frame[data-hero-overlay="autoScrim"] .sf-banner__media::after {
+    background: linear-gradient(to bottom, rgba(0,0,0,0.04), rgba(0,0,0,0.28));
+  }
+  .sf-frame[data-hero-overlay="darkScrim"] .sf-banner__media::after {
+    background: linear-gradient(to bottom, rgba(0,0,0,0.12), rgba(0,0,0,0.48));
+  }
+  .sf-frame[data-hero-overlay="none"] .sf-banner__media::after {
+    display: none;
+  }
+  .sf-frame[data-tagline-placement="none"] .sf-hero-tagline { display: none; }
+  .sf-frame[data-tagline-placement="center"] .sf-hero-tagline,
+  .sf-frame[data-tagline-placement="bottomLeft"] .sf-hero-tagline,
+  .sf-frame[data-tagline-placement="bottomRight"] .sf-hero-tagline {
+    position: static !important;
+    transform: none !important;
+  }
+
+
+</style>
+</head>
+
+<body>
+
+<!-- ===========================================================================
+     Phone-frame container
+     `data-followed="true"` here would hide the follow button (mimics
+     `storeInfo.exclusiveDealsFlag === 1` in the original).
+     =========================================================================== -->
+<div class="sf-frame" id="sf-root" data-followed="false">
+  <div class="sf-frame__scroll">
+
+  <!-- 1. Banner + circular logo  (was: <swiper> over storeInfo.bannerUrl) -->
+  <div class="sf-hero">
+  <section class="sf-banner">
+    <div class="sf-banner__media">
+      <img class="sf-banner__img" id="sf-banner" alt="Store banner">
+      <div class="sf-banner__actions" aria-hidden="true">
+        <span class="sf-banner__action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg></span>
+        <span class="sf-banner__action-group">
+          <span class="sf-banner__action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg></span>
+          <span class="sf-banner__action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></span>
+        </span>
+      </div>
+      <div class="sf-banner__dots" aria-hidden="true">
+        <span class="sf-banner__dot sf-banner__dot--active"></span>
+        <span class="sf-banner__dot"></span>
+        <span class="sf-banner__dot"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Hero meta (name + open state) -->
+  <div class="sf-info sf-info--hero">
+    <div class="sf-info__head">
+      <div class="sf-info__hero-left">
+        <span id="sf-name">Store name</span>
+        <div class="sf-hero-tagline" id="sf-hero-tagline"></div>
+        <div class="sf-hero-meta-row">
+          <span class="sf-open-badge">
+            <span class="sf-open-badge__dot"></span>
+            <strong id="sf-open-state">Closed now</strong>
+          </span>
+          <span class="sf-hero-hours" id="sf-opens-at"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sf-banner__logo-wrap">
+    <img class="sf-banner__logo" id="sf-logo" alt="Store logo">
+  </div>
+  </div>
+
+  <!-- 3. Description + tags (netlify section 2) -->
+  <section class="sf-store-intro">
+    <div class="sf-info__body sf-info__body--intro">
+      <div class="sf-card-section">
+        <input type="checkbox" id="sf-desc-more" class="sf-desc-more" hidden>
+        <p class="sf-description" id="sf-description"></p>
+        <label for="sf-desc-more" class="sf-read-more"></label>
+      </div>
+      <div class="sf-tags-section">
+        <div class="sf-tags" id="sf-tags"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Marketing area: ad, offers, products -->
+  <section class="sf-market">
+
+    <div class="sf-ads">
+      <div class="sf-ad">
+        <img class="sf-ad__logo" id="sf-ad-logo" alt="">
+        <div class="sf-ad__text" id="sf-ad-text">Welcome to my store.</div>
+      </div>
+    </div>
+
+    <div id="sf-offers-section" class="sf-offers-block">
+      <h2 class="sf-section-head">
+        <span class="sf-section-head__label">Offers</span>
+        <span class="sf-section-head__link">See all<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></span>
+      </h2>
+      <div class="sf-coupon-list" id="sf-coupons"></div>
+      <div class="sf-offer-dots" id="sf-offer-dots" aria-hidden="true"></div>
+    </div>
+
+    <div id="sf-showcase-section" class="sf-showcase-block">
+      <h2 class="sf-section-head sf-section-head--showcase">
+        <span class="sf-section-head__label">Our Products</span>
+        <span class="sf-section-head__link">See all<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></span>
+      </h2>
+      <div class="sf-showcase" id="sf-showcase"></div>
+      <div class="sf-showcase-dots" id="sf-showcase-dots" aria-hidden="true"></div>
+    </div>
+
+    <div id="sf-products-section" class="sf-products-block">
+      <h2 class="sf-section-head sf-section-head--products">
+        <span class="sf-section-head__label">All Products &amp; Services</span>
+      </h2>
+      <div class="sf-product-filters" id="sf-product-filters" aria-label="Product categories"></div>
+      <div class="sf-products" id="sf-products"></div>
+      <button class="sf-products-catalogue" type="button" id="sf-products-catalogue">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7"/></svg>
+        View full catalogue
+      </button>
+    </div>
+  </section>
+
+  <!-- 6. Store information (netlify section 6) -->
+  <section class="sf-store-details sf-info">
+    <h2 class="sf-section-head sf-section-head--store">
+      <span class="sf-section-head__label">Store Information</span>
+    </h2>
+    <div class="sf-info__body sf-info__body--details">
+      <div class="sf-info-list">
+
+        <button class="sf-info-item" id="sf-address" type="button">
+          <span class="sf-info-icon" aria-hidden="true">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </span>
+          <span class="sf-info-text">
+            <span class="sf-info-label">Address</span>
+            <span class="sf-info-value" id="sf-address-text"></span>
+          </span>
+          <svg class="sf-info-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+
+        <a class="sf-info-item" id="sf-phone" href="#">
+          <span class="sf-info-icon" aria-hidden="true">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+          </span>
+          <span class="sf-info-text">
+            <span class="sf-info-label">Phone</span>
+            <span class="sf-info-value sf-info-value--link" id="sf-phone-text"></span>
+          </span>
+          <svg class="sf-info-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </a>
+
+        <a class="sf-info-item" id="sf-email" href="#">
+          <span class="sf-info-icon" aria-hidden="true">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          </span>
+          <span class="sf-info-text">
+            <span class="sf-info-label">Email</span>
+            <span class="sf-info-value sf-info-value--link" id="sf-email-text"></span>
+          </span>
+          <svg class="sf-info-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </a>
+
+        <div class="sf-info-item sf-info-item--static" id="sf-social-row">
+          <span class="sf-info-icon" aria-hidden="true">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+          </span>
+          <span class="sf-info-text">
+            <span class="sf-info-label">Social media</span>
+            <span class="sf-social-row">
+              <button class="sf-social-btn" type="button" id="sf-social-instagram" title="Instagram" aria-label="Instagram">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+              </button>
+              <button class="sf-social-btn" type="button" id="sf-social-facebook" title="Facebook" aria-label="Facebook">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
+              </button>
+              <button class="sf-social-btn" type="button" id="sf-social-website" title="Website" aria-label="Website">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+              </button>
+            </span>
+          </span>
+        </div>
+
+      </div>
+
+
+    </div>
+  </section>
+
+  <section class="sf-hours-section" aria-labelledby="sf-hours-heading">
+    <h2 class="sf-section-head" id="sf-hours-heading">
+      <span class="sf-section-head__label">Opening Hours</span>
+    </h2>
+    <div class="sf-hours" id="sf-hours"></div>
+  </section>
+
+  <div class="sf-spacer-bottom" aria-hidden="true"></div>
+
+  </div>
+
+  <!-- 4. Follow FAB — fixed over content (netlify fab-wrapper) -->
+  <div class="sf-follow">
+    <button class="sf-follow__btn" type="button" id="sf-follow-btn" aria-label="Add to your world">
+      <span class="sf-follow__btn-icon" aria-hidden="true">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+        </svg>
+      </span>
+    </button>
+  </div>
+
+  <!-- 7. Get directions (netlify sticky CTA) -->
+  <div class="sf-directions">
+    <button class="sf-directions__btn" type="button" id="sf-directions-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+      Get directions
+    </button>
+  </div>
+
+</div>
+
+<!-- Toast — populated by showToast(text) -->
+<div class="sf-toast" id="sf-toast" role="status" aria-live="polite"></div>
+
+<script>
+  /* ----------------------------------------------------------------------------
+     Mock storeInfo
+     Shape matches `getStoreInfo({ uuid, type: 'BASIC' }).content` from
+     api/modules/store.js. Replace with `await fetch(...)` when wiring up.
+     ---------------------------------------------------------------------------- */
+  const storeInfo = {
+    shopUuid: "demo-shop-uuid",
+    shopName: "Central Bar Milan",
+    localShopName: "Central Bar Milan",
+    introduction:
+      "A corner of Milanese tradition in the heart of the city. For over 30 years we've been serving " +
+      "the neighbourhood's finest coffee, alongside handcrafted cocktails and a weekend brunch worth " +
+      "coming back for every time. Welcoming atmosphere, always-smiling staff and a selection of " +
+      "natural wines from around the world.",
+    logoUrl:
+      "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=200&h=200&fit=crop&auto=format&q=85",
+    bannerUrl: [
+      "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800&h=500&fit=crop&auto=format&q=85",
+      "https://images.unsplash.com/photo-1525610553991-2bede1a236e2?w=800&h=500&fit=crop&auto=format&q=85",
+      "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&h=500&fit=crop&auto=format&q=85"
+    ],
+    exclusiveDealsFlag: 0,
+    quickAccessFlag: 0,
+    shopLevel: "store_front",
+    tags: [
+      { categoryType: "primary",  name: "Coffee" },
+      { categoryType: "category", name: "Cocktails" },
+      { categoryType: "default",  name: "Brunch" },
+      { categoryType: "default",  name: "Natural Wines" },
+      { categoryType: "default",  name: "Wi-Fi" }
+    ],
+    storefrontInfo: {
+      contactAreaCode: "+39",
+      contactPhone: "0212345678",
+      email: "info@barcentralemilano.it",
+      address: "Via Brera 14, 20121 Milano, Italy",
+      localAddress: "Via Brera 14, 20121 Milano",
+      businessInfo: {
+        open: true,
+        openTime: "10:00",
+        businessHour: [
+          { dayOfWeek: "WEDNESDAY", open: true,  timePeriods: [{ startTime: "07:00", endTime: "22:00" }] },
+          { dayOfWeek: "THURSDAY",  open: true,  timePeriods: [{ startTime: "07:00", endTime: "23:00" }] },
+          { dayOfWeek: "FRIDAY",    open: true,  timePeriods: [{ startTime: "07:00", endTime: "01:00" }] },
+          { dayOfWeek: "SATURDAY",  open: true,  timePeriods: [{ startTime: "09:00", endTime: "01:00" }] },
+          { dayOfWeek: "SUNDAY",    open: false, timePeriods: [] },
+          { dayOfWeek: "MONDAY",    open: true,  timePeriods: [{ startTime: "07:00", endTime: "22:00" }] },
+          { dayOfWeek: "TUESDAY",   open: true,  timePeriods: [{ startTime: "07:00", endTime: "22:00" }] }
+        ]
+      }
+    },
+    coupons: [
+      {
+        couponUuid: "c1",
+        name: "−20% on all aperitifs Monday to Thursday",
+        discountAmount: 20,
+        minAmount: 0,
+        viewStatus: "uncollected",
+        imageUrl:
+          "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=680&h=300&fit=crop&auto=format&q=80",
+        validStartTimeStr: "2026-03-01 00:00:00",
+        validEndTimeStr:   "2026-03-31 23:59:59"
+      },
+      {
+        couponUuid: "c2",
+        name: "Full breakfast + double espresso",
+        discountAmount: 5,
+        minAmount: 0,
+        viewStatus: "availableForUse",
+        userCouponUuid: "uc-2",
+        imageUrl:
+          "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=680&h=300&fit=crop&auto=format&q=80",
+        validStartTimeStr: "2026-01-01 00:00:00",
+        validEndTimeStr:   "2026-12-31 23:59:59"
+      },
+      {
+        couponUuid: "c3",
+        name: "Second Spritz on us — every Friday",
+        discountAmount: 50,
+        minAmount: 0,
+        viewStatus: "used",
+        imageUrl:
+          "https://images.unsplash.com/photo-1543253687-c931c8e01820?w=680&h=300&fit=crop&auto=format&q=80"
+      }
+    ],
+    products: [
+      {
+        uuid: "p1",
+        name: "Cappuccino",
+        image: [{
+          fileUrl:
+            "https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=420&h=600&fit=crop&auto=format&q=80"
+        }],
+        price: 2,
+        originPrice: 0,
+        productLabels: ["Coffee Bar"]
+      },
+      {
+        uuid: "p2",
+        name: "Artisan Croissant",
+        image: [{
+          fileUrl:
+            "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=420&h=600&fit=crop&auto=format&q=80"
+        }],
+        price: 1.3,
+        originPrice: 0,
+        productLabels: ["Coffee Bar"]
+      },
+      {
+        uuid: "p3",
+        name: "Aperol Spritz",
+        image: [{
+          fileUrl:
+            "https://images.unsplash.com/photo-1543253687-c931c8e01820?w=420&h=600&fit=crop&auto=format&q=80"
+        }],
+        price: 7,
+        originPrice: 0,
+        productLabels: ["Aperitif"]
+      },
+      {
+        uuid: "p4",
+        name: "Avocado Toast",
+        image: [{
+          fileUrl:
+            "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=420&h=600&fit=crop&auto=format&q=80"
+        }],
+        price: 11,
+        originPrice: 0,
+        productLabels: ["Brunch"]
+      },
+      {
+        uuid: "p5",
+        name: "Tiramisù in a Glass",
+        image: [{
+          fileUrl:
+            "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=420&h=600&fit=crop&auto=format&q=80"
+        }],
+        price: 5.5,
+        originPrice: 0,
+        productLabels: ["Desserts"]
+      },
+      {
+        uuid: "p6",
+        name: "Natural Wines Selection",
+        image: [{
+          fileUrl:
+            "https://images.unsplash.com/photo-1474722883778-792e7990302f?w=420&h=600&fit=crop&auto=format&q=80"
+        }],
+        price: 5,
+        originPrice: 0,
+        productLabels: ["Wines"]
+      }
+    ],
+
+    // Theme customization — generated by the design agent
+    theme: {
+      // Theme metadata
+      name: "Default Theme",
+      description: "Clean, modern storefront design",
+
+      // Colors
+      primaryColor: "#B63F81",
+      secondaryColor: "#2C2C2C",
+      accentColor: "#B63F81",
+      backgroundColor: "#F8F9FA",
+      surfaceColor: "#FFFFFF",
+      textPrimary: "#3B3B4D",
+      textSecondary: "#5F6E7D",
+
+      // Typography (Google Fonts)
+      headingFont: "Montserrat",
+      bodyFont: "Roboto",
+
+      // Shape
+      borderRadius: "rounded",  // sharp | soft | rounded | pill
+
+      // Spacing
+      spacing: "normal"  // compact | normal | spacious
+    }
+  };
+
+  /* ----------------------------------------------------------------------------
+     i18n surface (subset of storefrontHome / couponComponent from i18n/EN_US.js)
+     If you need to localise, swap this object out.
+     ---------------------------------------------------------------------------- */
+  const i18n = {
+    am: "AM",
+    pm: "PM",
+    openNow: "Opening now",
+    closedNow: "Closed now",
+    opensAt: (time, unit) => `Opens at ${time} ${unit}`,
+    addToWorld: "Add to your world",
+    thisWeek: "THIS WEEK",
+    nextWeek: "NEXT WEEK",
+    closedDay: "Closed",
+    threshold: (discount, min) => `Minus ${discount}€ Over ${min}€`,
+    validDuration: "Valid:",
+    getIt: "GET IT",
+    use: "USE",
+    expireTime: "Expires:",
+    status: {
+      uncollected: "uncollected",
+      availableForUse: "available",
+      used: "used",
+      expired: "expired",
+      invalidForOrder: "invalid"
+    },
+    toasts: {
+      emailCopied: (e) => `${e} copied`,
+      addressCopied: (a) => `${a} — copied`,
+      copyFailed: "Copy failed",
+      getSuccess: "Added successfully"
+    }
+  };
+
+  /* ----------------------------------------------------------------------------
+     Small helpers
+     ---------------------------------------------------------------------------- */
+  const $ = (sel) => document.querySelector(sel);
+  const el = (tag, className, html) => {
+    const n = document.createElement(tag);
+    if (className) n.className = className;
+    if (html != null) n.innerHTML = html;
+    return n;
+  };
+  const formatPrice = (n) => {
+    if (n == null || n === "") return "";
+    return Number(n).toLocaleString("en", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  };
+  const labelClass = (categoryType) => {
+    // Mirrors components/coupon/business.sjs and storefront business.sjs
+    if (categoryType === "primary")  return "sf-tag sf-tag--primary";
+    if (categoryType === "category") return "sf-tag sf-tag--category";
+    return "sf-tag";
+  };
+  const dayAbbrev = (dow) => ({
+    MONDAY: "MON", TUESDAY: "TUE", WEDNESDAY: "WED",
+    THURSDAY: "THU", FRIDAY: "FRI", SATURDAY: "SAT", SUNDAY: "SUN"
+  }[dow] || dow);
+  const splitHoursAtMonday = (hours) => {
+    // Replicates backBusinessHourList from home.js: split at MONDAY into
+    // [this week, next week]; if MONDAY is at index 0, no split.
+    const idx = hours.findIndex((h) => h.dayOfWeek === "MONDAY");
+    if (idx <= 0) return [hours];
+    return [hours.slice(0, idx), hours.slice(idx)];
+  };
+  const formatDateRange = (start, end) => {
+    if (!start) return "";
+    const fmt = (s) => s.replace(/[-T]/g, "/").slice(0, 16);
+    return `${fmt(start)} — ${fmt(end || "")}`;
+  };
+  function showToast(text, ms = 1800) {
+    const t = $("#sf-toast");
+    t.textContent = text;
+    t.classList.add("is-visible");
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => t.classList.remove("is-visible"), ms);
+  }
+
+  /* ----------------------------------------------------------------------------
+     Theme application — maps storeInfo.theme to CSS custom properties
+     ---------------------------------------------------------------------------- */
+  const RADIUS_MAP = {
+    sharp: { sm: "2px", md: "4px", lg: "6px", pill: "6px" },
+    soft: { sm: "6px", md: "10px", lg: "14px", pill: "999px" },
+    rounded: { sm: "8px", md: "12px", lg: "16px", pill: "999px" },
+    pill: { sm: "999px", md: "999px", lg: "999px", pill: "999px" }
+  };
+
+  const SPACING_MAP = {
+    compact: { section: "12px", card: "10px", element: "6px" },
+    normal: { section: "20px", card: "14px", element: "10px" },
+    spacious: { section: "28px", card: "20px", element: "14px" }
+  };
+
+  function applyTheme(theme) {
+    if (!theme) return;
+
+    const frame = document.getElementById("sf-root");
+    const themeTargets = [document.documentElement, frame].filter(Boolean);
+    const setOnTargets = (name, value) => {
+      if (value == null || value === "") return;
+      themeTargets.forEach((target) => target.style.setProperty(name, value));
+    };
+
+    // Colors
+    setOnTargets("--color-pink", theme.primaryColor);
+    setOnTargets("--sf-color-primary", theme.primaryColor);
+    setOnTargets("--color-cta", theme.secondaryColor);
+    setOnTargets("--sf-color-ink", theme.secondaryColor);
+    setOnTargets("--color-pink-dark", theme.accentColor);
+    setOnTargets("--color-bg-page", theme.backgroundColor);
+    setOnTargets("--sf-color-page", theme.backgroundColor);
+    setOnTargets("--color-bg-subtle", theme.backgroundColor);
+    setOnTargets("--color-white", theme.surfaceColor);
+    setOnTargets("--sf-color-surface", theme.surfaceColor);
+    setOnTargets("--color-text-dark", theme.textPrimary);
+    setOnTargets("--sf-color-text", theme.textPrimary);
+    setOnTargets("--sf-color-ink-soft", theme.textPrimary);
+    setOnTargets("--color-text-mid", theme.textSecondary);
+    setOnTargets("--sf-color-text-muted", theme.textSecondary);
+
+    // Typography — load Google Fonts dynamically
+    if (theme.headingFont || theme.bodyFont) {
+      const fonts = [theme.headingFont, theme.bodyFont].filter(Boolean);
+      const uniqueFonts = [...new Set(fonts)];
+      const fontQuery = uniqueFonts.map(f => f.replace(/ /g, "+") + ":wght@300;400;500;600;700").join("&family=");
+      const linkId = "dynamic-google-fonts";
+      let link = document.getElementById(linkId);
+      if (!link) {
+        link = document.createElement("link");
+        link.id = linkId;
+        link.rel = "stylesheet";
+        document.head.appendChild(link);
+      }
+      link.href = `https://fonts.googleapis.com/css2?family=${fontQuery}&display=swap`;
+    }
+    if (theme.headingFont) {
+      const headingStack = `'${theme.headingFont}', sans-serif`;
+      setOnTargets("--font-sans", headingStack);
+      setOnTargets("--sf-font-display", headingStack);
+    }
+    if (theme.bodyFont) {
+      const bodyStack = `'${theme.bodyFont}', sans-serif`;
+      setOnTargets("--font-body", bodyStack);
+      setOnTargets("--sf-font-sans", bodyStack);
+    }
+
+    // Border radius
+    const radiusPreset = RADIUS_MAP[theme.borderRadius] || RADIUS_MAP.rounded;
+    setOnTargets("--radius-sm", radiusPreset.sm);
+    setOnTargets("--radius-md", radiusPreset.md);
+    setOnTargets("--radius-lg", radiusPreset.lg);
+    setOnTargets("--radius-full", radiusPreset.pill);
+    setOnTargets("--sf-radius-sm", radiusPreset.sm);
+    setOnTargets("--sf-radius-md", radiusPreset.md);
+    setOnTargets("--sf-radius-lg", radiusPreset.lg);
+    setOnTargets("--sf-radius-pill", radiusPreset.pill);
+
+    // Spacing
+    const spacingPreset = SPACING_MAP[theme.spacing] || SPACING_MAP.normal;
+    setOnTargets("--spacing-section", spacingPreset.section);
+    setOnTargets("--spacing-card", spacingPreset.card);
+    setOnTargets("--spacing-element", spacingPreset.element);
+  }
+
+  /* ----------------------------------------------------------------------------
+     Render
+     ---------------------------------------------------------------------------- */
+  function render(info) {
+    // Apply theme first
+    applyTheme(info.theme);
+    // Banner + logo
+    $("#sf-banner").src = info.bannerUrl[0] || "";
+    $("#sf-logo").src   = info.logoUrl || "";
+    $("#sf-ad-logo").src = info.logoUrl || "";
+
+    // Name + intro
+    $("#sf-name").textContent = info.localShopName || info.shopName || "";
+    const taglineEl = $("#sf-hero-tagline");
+    if (taglineEl) {
+      taglineEl.textContent = info.tags.length
+        ? info.tags
+            .slice(0, 3)
+            .map((t) => t.name)
+            .join(" · ")
+        : "";
+    }
+    $("#sf-description").textContent = info.introduction || "";
+
+    // Tags
+    const tagsHost = $("#sf-tags");
+    tagsHost.replaceChildren(...info.tags.map((t) => el("span", labelClass(t.categoryType), t.name)));
+
+    const sf = info.storefrontInfo;
+    const addressText = sf.localAddress || sf.address || "";
+
+    // Store information rows (netlify info-list)
+    $("#sf-address-text").textContent = addressText;
+    const addressBtn = $("#sf-address");
+    if (addressBtn) {
+      addressBtn.addEventListener("click", () => {
+        if (!addressText) return;
+        window.open(
+          "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(addressText),
+          "_blank",
+          "noopener,noreferrer"
+        );
+      });
+    }
+
+    const phoneLink = $("#sf-phone");
+    const phoneText = $("#sf-phone-text");
+    if (sf.contactPhone && phoneLink && phoneText) {
+      const dial = (sf.contactAreaCode || "") + sf.contactPhone;
+      const display = [sf.contactAreaCode, sf.contactPhone].filter(Boolean).join(" ").trim();
+      phoneText.textContent = display;
+      phoneLink.href = `tel:${dial.replace(/\s/g, "")}`;
+    } else if (phoneLink) {
+      phoneLink.style.display = "none";
+    }
+
+    const emailLink = $("#sf-email");
+    const emailText = $("#sf-email-text");
+    if (sf.email && emailLink && emailText) {
+      emailText.textContent = sf.email;
+      emailLink.href = `mailto:${sf.email}`;
+    } else if (emailLink) {
+      emailLink.style.display = "none";
+    }
+
+    const directionsBtn = document.getElementById("sf-directions-btn");
+    if (directionsBtn) {
+      directionsBtn.addEventListener("click", () => {
+        const text = sf.localAddress || sf.address || "";
+        if (text) {
+          window.open(
+            "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(text),
+            "_blank",
+            "noopener,noreferrer"
+          );
+        }
+      });
+    }
+
+    // Open state + opens-at
+    const biz = sf.businessInfo;
+    $("#sf-open-state").textContent = biz.open ? i18n.openNow : i18n.closedNow;
+    if (!biz.open && biz.openTime) {
+      const hour = parseInt(biz.openTime.split(":")[0], 10);
+      const unit = hour >= 12 ? i18n.pm : i18n.am;
+      $("#sf-opens-at").textContent = "· " + i18n.opensAt(biz.openTime, unit);
+    } else {
+      $("#sf-opens-at").textContent = "";
+    }
+
+    // Hours — split into this week / next week
+    const hoursHost = $("#sf-hours");
+    hoursHost.innerHTML = "";
+    splitHoursAtMonday(biz.businessHour).forEach((group, gi) => {
+      const label = el("div", "sf-hours__group-label", gi === 0 ? i18n.thisWeek : i18n.nextWeek);
+      hoursHost.appendChild(label);
+      group.forEach((row) => {
+        const r = el("div", "sf-hours__row");
+        r.appendChild(el("div", "sf-hours__day", dayAbbrev(row.dayOfWeek) + "."));
+        const times = el("div", "sf-hours__times");
+        if (row.open && row.timePeriods.length) {
+          row.timePeriods.forEach((tp) => {
+            times.appendChild(el("div", null, `${tp.startTime} – ${tp.endTime}`));
+          });
+        } else {
+          times.appendChild(el("div", null, i18n.closedDay));
+        }
+        r.appendChild(times);
+        hoursHost.appendChild(r);
+      });
+    });
+
+    // Follow CTA — gate via data attribute
+    $("#sf-root").dataset.followed = info.exclusiveDealsFlag === 1 ? "true" : "false";
+    const followBtn = $("#sf-follow-btn");
+    if (followBtn) {
+      followBtn.setAttribute("aria-label", i18n.addToWorld);
+      followBtn.addEventListener("click", () => {
+        // Real flow opens consent-drawer + calls changeMerchantStatus.
+        // For the template, just flip the flag and toast.
+        $("#sf-root").dataset.followed = "true";
+        showToast("Added to your world");
+      });
+    }
+
+    // Coupons
+    const couponHost = $("#sf-coupons");
+    couponHost.replaceChildren(...info.coupons.map(renderCoupon));
+    $("#sf-offers-section").style.display = info.coupons.length ? "" : "none";
+
+    // Our Products showcase carousel
+    const showcaseHost = $("#sf-showcase");
+    showcaseHost.replaceChildren(...info.products.map(renderShowcaseCard));
+    const showcaseSection = $("#sf-showcase-section");
+    showcaseSection.style.display = info.products.length ? "" : "none";
+    initShowcaseCarousel();
+
+    // Products
+    const productHost = $("#sf-products");
+    productHost.replaceChildren(...info.products.map(renderProduct));
+    const productsSection = $("#sf-products-section");
+    productsSection.style.display = info.products.length ? "" : "none";
+    syncProductFilters(info.products);
+  }
+
+  function renderCoupon(c) {
+    const card = el("article", "sf-coupon");
+    card.dataset.status = c.viewStatus;
+
+    // Status badge
+    card.appendChild(el("div", "sf-coupon__status", i18n.status[c.viewStatus] || c.viewStatus));
+
+    // Left side
+    const cover = el("div", "sf-coupon__cover");
+    if (c.imageUrl) {
+      const img = el("img", "sf-coupon__cover-img");
+      img.src = c.imageUrl;
+      img.alt = "";
+      cover.appendChild(img);
+    }
+    cover.appendChild(el("div", "sf-coupon__amount",
+      `${formatPrice(c.discountAmount)}<span class="sf-coupon__amount-unit">€</span>`));
+    card.appendChild(cover);
+
+    // Right side
+    const body = el("div", "sf-coupon__body");
+    const desc = el("div");
+
+    if (c.viewStatus === "invalidForOrder" && c.couponOrderInfo) {
+      desc.appendChild(el("div", "sf-coupon__invalid-reason",
+        c.couponOrderInfo.invalidForOrderReason || ""));
+    }
+    desc.appendChild(el("div", "sf-coupon__name", c.name || ""));
+    if (c.minAmount) {
+      desc.appendChild(el("div", "sf-coupon__threshold",
+        i18n.threshold(formatPrice(c.discountAmount), formatPrice(c.minAmount))));
+    }
+    if (c.validStartTimeStr && c.viewStatus !== "used" && c.viewStatus !== "expired") {
+      const v = el("div", "sf-coupon__valid");
+      v.textContent = i18n.validDuration;
+      v.appendChild(el("span", "sf-coupon__valid-range",
+        " " + formatDateRange(c.validStartTimeStr, c.validEndTimeStr)));
+      desc.appendChild(v);
+    }
+    if (c.viewStatus === "expired" && c.expireTimeStr) {
+      desc.appendChild(el("div", "sf-coupon__valid",
+        i18n.expireTime + " " + c.expireTimeStr));
+    }
+    body.appendChild(desc);
+
+    // Action — GET IT or USE
+    const actionable =
+      c.viewStatus === "uncollected" ||
+      c.viewStatus === "availableForUse" ||
+      c.viewStatus === "invalidForOrder";
+
+    if (actionable) {
+      const actions = el("div", "sf-coupon__actions");
+      const btn = el("button", "sf-coupon__btn",
+        c.viewStatus === "uncollected" ? i18n.getIt : i18n.use);
+      btn.disabled = c.viewStatus === "invalidForOrder";
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (c.viewStatus === "uncollected") {
+          // Real flow: collectCouponByUuid(...). For the template, toast.
+          showToast(i18n.toasts.getSuccess);
+        } else {
+          // Real flow: navigate to couponDetail with userCouponUuid.
+          showToast(`Open coupon ${c.couponUuid}`);
+        }
+      });
+      actions.appendChild(btn);
+      body.appendChild(actions);
+    }
+
+    card.appendChild(body);
+    return card;
+  }
+
+  function renderShowcaseCard(p) {
+    const card = el("article", "sf-showcase-card");
+
+    const media = el("div", "sf-showcase-card__media");
+    const img = el("img", "sf-showcase-card__image");
+    img.src = p.image && p.image[0] ? p.image[0].fileUrl : "";
+    img.alt = p.name || "";
+    media.appendChild(img);
+    card.appendChild(media);
+
+    const body = el("div", "sf-showcase-card__body");
+    const categoryText =
+      p.productLabels && p.productLabels.length ? p.productLabels[0] : "Featured";
+    body.appendChild(el("div", "sf-showcase-card__category", categoryText));
+    body.appendChild(el("div", "sf-showcase-card__name", p.name || ""));
+
+    const footer = el("div", "sf-showcase-card__footer");
+    const price = el("div", "sf-showcase-card__price");
+    if (p.originPrice && Number(p.originPrice) > 0 && Number(p.originPrice) !== Number(p.price)) {
+      price.appendChild(document.createTextNode(`€ ${formatPrice(p.price)} `));
+      price.appendChild(
+        el("span", "sf-showcase-card__price-original", `€ ${formatPrice(p.originPrice)}`)
+      );
+    } else if (!p.originPrice || Number(p.originPrice) === 0) {
+      price.textContent = `from € ${formatPrice(p.price)}`;
+    } else {
+      price.textContent = `€ ${formatPrice(p.price)}`;
+    }
+    footer.appendChild(price);
+
+    const addBtn = el("button", "sf-showcase-card__add");
+    addBtn.type = "button";
+    addBtn.setAttribute("aria-label", "Add product");
+    addBtn.innerHTML =
+      '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">' +
+      '<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>';
+    footer.appendChild(addBtn);
+
+    body.appendChild(footer);
+    card.appendChild(body);
+    return card;
+  }
+
+  function initShowcaseCarousel() {
+    const outer = document.getElementById("sf-showcase");
+    const dotsHost = document.getElementById("sf-showcase-dots");
+    if (!outer || !dotsHost) return;
+
+    const cards = Array.from(outer.querySelectorAll(".sf-showcase-card"));
+    if (!cards.length) {
+      dotsHost.replaceChildren();
+      return;
+    }
+
+    dotsHost.replaceChildren(
+      ...cards.map((_, index) => {
+        const dot = document.createElement("span");
+        dot.className = "sf-showcase-dot" + (index === 0 ? " active" : "");
+        return dot;
+      })
+    );
+
+    const dots = Array.from(dotsHost.querySelectorAll(".sf-showcase-dot"));
+    const CARD_W = 210;
+    const GAP = 14;
+    const STEP = CARD_W + GAP;
+
+    function updateCardStyles() {
+      const width = outer.offsetWidth;
+      const center = outer.scrollLeft + width / 2;
+      cards.forEach((card) => {
+        const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+        const dist = Math.abs(cardCenter - center);
+        const t = Math.min(dist / STEP, 1);
+        card.style.transform = `scale(${1 - t * 0.14})`;
+        card.style.opacity = String(1 - t * 0.28);
+      });
+    }
+
+    if (outer._sfShowcaseOnScroll) {
+      outer.removeEventListener("scroll", outer._sfShowcaseOnScroll);
+    }
+    outer._sfShowcaseOnScroll = () => {
+      const index = Math.round(outer.scrollLeft / STEP);
+      dots.forEach((dot, i) => dot.classList.toggle("active", i === index));
+      updateCardStyles();
+    };
+    outer.addEventListener("scroll", outer._sfShowcaseOnScroll, { passive: true });
+
+    dots.forEach((dot, index) => {
+      dot.addEventListener("click", () => {
+        outer.scrollTo({ left: index * STEP, behavior: "smooth" });
+      });
+    });
+
+    if (outer._sfShowcaseOnDown) {
+      outer.removeEventListener("mousedown", outer._sfShowcaseOnDown);
+    }
+    if (outer._sfShowcaseOnMove) {
+      window.removeEventListener("mousemove", outer._sfShowcaseOnMove);
+    }
+    if (outer._sfShowcaseOnUp) {
+      window.removeEventListener("mouseup", outer._sfShowcaseOnUp);
+    }
+
+    let isDown = false;
+    let startX = 0;
+    let startScroll = 0;
+    let moved = false;
+
+    outer._sfShowcaseOnDown = (event) => {
+      isDown = true;
+      moved = false;
+      startX = event.pageX;
+      startScroll = outer.scrollLeft;
+      outer.classList.add("is-dragging");
+    };
+    outer._sfShowcaseOnMove = (event) => {
+      if (!isDown) return;
+      const dx = event.pageX - startX;
+      if (Math.abs(dx) > 4) moved = true;
+      outer.scrollLeft = startScroll - dx;
+    };
+    outer._sfShowcaseOnUp = () => {
+      if (!isDown) return;
+      isDown = false;
+      outer.classList.remove("is-dragging");
+    };
+
+    outer.addEventListener("mousedown", outer._sfShowcaseOnDown);
+    window.addEventListener("mousemove", outer._sfShowcaseOnMove);
+    window.addEventListener("mouseup", outer._sfShowcaseOnUp);
+    outer.addEventListener(
+      "click",
+      (event) => {
+        if (moved) event.stopPropagation();
+      },
+      true
+    );
+
+    updateCardStyles();
+  }
+
+  function renderProduct(p) {
+    const card = el("article", "sf-product");
+    if (p.productLabels && p.productLabels.length) {
+      card.dataset.categories = p.productLabels.join("|");
+    }
+
+    const media = el("div", "sf-product__media");
+    const img = el("img", "sf-product__image");
+    img.src = p.image && p.image[0] ? p.image[0].fileUrl : "";
+    img.alt = p.name || "";
+    media.appendChild(img);
+
+    const heart = el("button", "sf-product__heart");
+    heart.type = "button";
+    heart.setAttribute("aria-label", "Save product");
+    heart.innerHTML =
+      '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">' +
+      '<path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>';
+    heart.addEventListener("click", (event) => {
+      event.stopPropagation();
+      heart.classList.toggle("is-liked");
+    });
+    media.appendChild(heart);
+    card.appendChild(media);
+
+    const body = el("div", "sf-product__body");
+    body.appendChild(el("div", "sf-product__name", p.name || ""));
+
+    const descText =
+      p.productLabels && p.productLabels.length ? p.productLabels.join(", ") : "";
+    body.appendChild(el("div", "sf-product__desc", descText));
+
+    if (p.productLabels && p.productLabels.length) {
+      const labels = el("div", "sf-product__labels");
+      p.productLabels.forEach((t) =>
+        labels.appendChild(el("span", "sf-product__label", t)));
+      body.appendChild(labels);
+    }
+
+    if (p.originPrice && Number(p.originPrice) > 0 && Number(p.originPrice) !== Number(p.price)) {
+      const prices = el("div", "sf-product__prices");
+      prices.appendChild(el("span", "sf-product__price", `€ ${formatPrice(p.price)}`));
+      prices.appendChild(
+        el("span", "sf-product__price-original", `€ ${formatPrice(p.originPrice)}`)
+      );
+      body.appendChild(prices);
+    } else {
+      const from = el("div", "sf-product__from");
+      from.appendChild(el("span", null, "from"));
+      from.appendChild(el("span", "sf-product__from-price", `€ ${formatPrice(p.price)}`));
+      body.appendChild(from);
+    }
+
+    card.appendChild(body);
+    return card;
+  }
+
+  function syncProductFilters(products) {
+    const host = document.getElementById("sf-product-filters");
+    if (!host) return;
+
+    const labels = new Set();
+    products.forEach((product) => {
+      (product.productLabels || []).forEach((label) => labels.add(label));
+    });
+
+    if (!labels.size) {
+      host.classList.add("is-hidden");
+      host.replaceChildren();
+      return;
+    }
+
+    host.classList.remove("is-hidden");
+    const tabs = ["All", ...labels];
+    host.replaceChildren(
+      ...tabs.map((label) => {
+        const btn = el(
+          "button",
+          "sf-product-filter" + (label === "All" ? " is-active" : ""),
+          label
+        );
+        btn.type = "button";
+        btn.dataset.filter = label === "All" ? "all" : label;
+        btn.addEventListener("click", () => {
+          host.querySelectorAll(".sf-product-filter").forEach((tab) => {
+            tab.classList.toggle(
+              "is-active",
+              tab.dataset.filter === (label === "All" ? "all" : label)
+            );
+          });
+          document.querySelectorAll(".sf-product").forEach((card) => {
+            if (label === "All") {
+              card.style.display = "";
+              return;
+            }
+            const categories = (card.dataset.categories || "").split("|");
+            card.style.display = categories.includes(label) ? "" : "none";
+          });
+        });
+        return btn;
+      })
+    );
+  }
+
+  // Boot
+  render(storeInfo);
+
+  (function syncNetlifyChrome() {
+    const dotsHost = document.getElementById("sf-offer-dots");
+    const count = document.getElementById("sf-coupons").children.length;
+    if (dotsHost && count > 1) {
+      dotsHost.replaceChildren(
+        ...Array.from({ length: count }, (_, i) => {
+          const dot = document.createElement("span");
+          dot.className = "sf-offer-dot" + (i === 0 ? " active" : "");
+          return dot;
+        })
+      );
+    }
+  })();
+
+
+  // Expose for quick console tweaking:
+  //   window.storeInfo.theme.primaryColor = '#FF5722'; render(window.storeInfo);
+  //   window.applyTheme({ primaryColor: '#4CAF50', borderRadius: 'pill' });
+  window.storeInfo = storeInfo;
+  window.render = render;
+  window.applyTheme = applyTheme;
+</script>
+
+</body>
+</html>

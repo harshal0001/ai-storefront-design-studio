@@ -1,0 +1,20 @@
+<ant-page safeArea="both" loading="{{loading}}" className="coupon-detail-wrapper">
+  <page-error a:if="{{pageError.show}}" image="{{pageError.image}}" messages="{{pageError.messages}}" />
+  <view a:else class="coupon-detail relative">
+    <view hidden="{{!couponDetail.viewStatus}}" class="coupon-wrapper text-right">
+      <coupon
+        dataSource="{{couponDetail}}"
+        showCode="{{!!couponDetail.userCouponCode}}"
+        showAction="{{showAction}}"
+        onAction="collectCoupon"
+      />
+      <view a:if="{{couponDetail.userCouponCode && couponBarcode}}" class="text-center">
+        <view class="coupon-barcode-number">
+          {{`CODE: ${couponDetail.userCouponCode}`}}
+        </view>
+        <image class="coupon-barcode__image" mode="scaleToFill" src="{{couponBarcode}}" />
+        <view class="coupon-barcode-tip">Present payment code for me</view>
+      </view>
+    </view>
+  </view>
+</ant-page>

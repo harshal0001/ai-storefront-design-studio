@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Content-Security-Policy (OWASP LLM05). Tuned to the app's real behavior:
+      blob: frames = live preview iframe; 'unsafe-inline' style = React inline styles;
+      *.amazonaws.com img/connect = S3 screenshot URLs; Google Fonts/Unsplash = generated storefront previews;
+      ws:/wss: + inline script = Vite HMR.
+      Tighten (drop 'unsafe-inline'/ws) when served via CloudFront response headers.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://*.amazonaws.com https://images.unsplash.com; connect-src 'self' https://*.amazonaws.com ws: wss:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'"
+    />
+    <title>Storefront Customizer</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

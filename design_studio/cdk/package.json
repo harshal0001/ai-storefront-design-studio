@@ -1,0 +1,39 @@
+{
+  "name": "design-studio-cdk",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "design-studio-cdk": "bin/app.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"bin/**/*.ts\" \"src/**/*.ts\" \"eslint.config.mjs\" \"*.json\"",
+    "format:check": "prettier --check \"bin/**/*.ts\" \"src/**/*.ts\" \"eslint.config.mjs\" \"*.json\"",
+    "watch": "tsc -w",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "deploy:all": "cdk deploy --all",
+    "diff": "cdk diff",
+    "destroy": "cdk destroy"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^22.7.5",
+    "aws-cdk": "^2.1000.0",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.6.3",
+    "typescript-eslint": "^8.60.0"
+  },
+  "dependencies": {
+    "@aws-cdk/aws-bedrock-agentcore-alpha": "^2.256.1-alpha.0",
+    "aws-cdk-lib": "^2.257.0",
+    "constructs": "^10.4.2"
+  }
+}

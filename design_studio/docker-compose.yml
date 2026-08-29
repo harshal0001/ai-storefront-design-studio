@@ -1,0 +1,26 @@
+# Local development stack for Design Studio.
+#
+# DynamoDB Local:
+#   docker compose up -d dynamodb-local
+#   ./scripts/dynamodb-local-create-tables.sh
+#
+# From the host:  DYNAMODB_ENDPOINT=http://127.0.0.1:8001
+# From a container on this network: DYNAMODB_ENDPOINT=http://dynamodb-local:8000
+
+services:
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    command: ['-jar', 'DynamoDBLocal.jar', '-inMemory', '-sharedDb']
+    # Host 8001 — design-server (FastAPI) already uses 8000 on the host.
+    ports:
+      - '8001:8000'
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          '[ "$(curl -s -o /dev/null -I -w ''%{http_code}'' http://127.0.0.1:8000)" = "400" ]',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s

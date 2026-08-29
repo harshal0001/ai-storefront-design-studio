@@ -1,0 +1,239 @@
+<import-sjs from="./business.sjs" name="businessSJS" />
+<import-sjs from="/utils/date.sjs" name="dateSJS" />
+<ant-page safeArea="none" loading="{{loading}}">
+  <page-error a:if="{{pageError.show}}" image="{{pageError.image}}" messages="{{pageError.messages}}" />
+  <block a:else>
+    <view class="home-background relative">
+      <swiper autoplay="{{true}}" circular="{{true}}">
+        <swiper-item
+          a:for="{{storeInfo.bannerUrl}}"
+          a:for-index="storeBannerIndex"
+          a:for-item="storeBannerUrl"
+          key="{{storeBannerIndex}}"
+        >
+          <image class="store-banner" mode="scaleToFill" src="{{storeBannerUrl}}" />
+        </swiper-item>
+      </swiper>
+      <view class="store-logo absolute text-center">
+        <image class="store-logo__image" mode="scaleToFill" src="{{storeInfo.logoUrl || '/assets/images/store_default_logo.png'}}" />
+        <image
+          class="store-logo-background absolute"
+          mode="scaleToFill"
+          src="/packageStorefront/assets/images/home_logo_bg.svg"
+        />
+      </view>
+    </view>
+    <view class="home-main flex">
+      <view class="{{infoCollapsed ? 'info-collapsed': ''}}">
+        <view class="store-info-head flex">
+          <text class="{{infoCollapsed ? 'line-clamp-1' : 'overflow-hidden'}}">
+            {{storeInfo.localShopName || storeInfo.shopName}}
+          </text>
+          <image
+            class="info-collapsed__icon"
+            onTap="switchInfoCpplapsed"
+            mode="scaleToFill"
+            src="/assets/icons/chevron_up_5F6E7D.svg"
+          />
+        </view>
+        <view class="store-info-content flex">
+          <view class="store-info-facade flex">
+            <view class="store-description">
+              {{storeInfo.introduction}}
+            </view>
+            <view class="store-labels flex">
+              <view
+                a:for="{{storeInfo.tags}}"
+                a:for-index="tagIndex"
+                a:for-item="tag"
+                class="{{businessSJS.backLabelTypeClass(tag.categoryType)}}"
+                key="{{tagIndex}}"
+              >
+                {{tag.name}}
+              </view>
+            </view>
+            <view class="store-features flex">
+              <image
+                class="store-feature"
+                onTap="callPhone"
+                mode="scaleToFill"
+                src="/packageStorefront/assets/icons/phone_circle_7F8FAB.svg"
+              />
+              <image
+                class="store-feature"
+                onTap="copyEmail"
+                mode="scaleToFill"
+                src="/packageStorefront/assets/icons/email_circle_7F8FAB.svg"
+              />
+            </view>
+          </view>
+          <view class="store-address flex" onTap="copyAddress">
+            <image
+              class="store-address__icon icon-size-24"
+              mode="scaleToFill"
+              src="/packageStorefront/assets/icons/location_5F6E7D.svg"
+            />
+            <view class="store-address__text">
+              {{ storeInfo.storefrontInfo.localAddress || storeInfo.storefrontInfo.address }}
+            </view>
+            <image
+              class="store-address__icon icon-size-20"
+              mode="scaleToFill"
+              src="/assets/icons/chevron_right_5F6E7D.svg"
+            />
+          </view>
+          <view class="{{closedCollapsed ? 'closed-collapsed' : ''}}">
+            <view class="store-closed flex">
+              <image
+                class="store-closed__icon icon-size-24"
+                mode="scaleToFill"
+                src="/packageStorefront/assets/icons/clock_5F6E7D.svg"
+              />
+              <view class="store-closed-description">
+                <view class="font-500">
+                  {{storeInfo.storefrontInfo.businessInfo.open ? 'Opening now' : 'Closed now'}}
+                </view>
+                <view a:if="{{!storeInfo.storefrontInfo.businessInfo.open && storeInfo.storefrontInfo.businessInfo.openTime}}">
+                  {{`Opens at ${storeInfo.storefrontInfo.businessInfo.openTime} ${dateSJS.backTwelveHourUnit(storeInfo.storefrontInfo.businessInfo.openTime)}`}}
+                </view>
+              </view>
+              <image
+                class="closed-collapsed__icon icon-size-20"
+                mode="scaleToFill"
+                src="/assets/icons/chevron_up_5F6E7D.svg"
+                onTap="switchClosedCollapsed"
+              />
+            </view>
+            <view class="store-closed-content flex">
+              <block
+                a:for="{{businessHourList}}"
+                a:for-index="businessHourIndex"
+                a:for-item="businessHour"
+                key="{{businessHourIndex}}"
+              >
+                <view class="store-closed-label">
+                  {{ businessHourIndex === 0 ? 'THIS WEEK' : 'NEXT WEEK' }}
+                </view>
+                <view
+                  a:for="{{businessHour}}"
+                  a:for-item="week"
+                  a:key="date"
+                  class="store-closed-item flex"
+                >
+                  <view class="store-closed-week">
+                    {{ businessSJS.backAbbreviationOfWeek(week.dayOfWeek) }}.
+                  </view>
+                  <view class="store-closed-time flex">
+                    <block a:if="{{week.open}}">
+                      <view
+                        a:for="{{ week.timePeriods }}"
+                        a:for-index="timePeriodIndex"
+                        a:for-item="timePeriod"
+                        key="{{timePeriodIndex}}"
+                        class="text-right"
+                      >
+                        {{ timePeriod.startTime }} - {{timePeriod.endTime}}
+                      </view>
+                    </block>
+                    <view a:else class="text-right">
+                      Closed
+                    </view>
+                  </view>
+                </view>
+              </block>
+            </view>
+          </view>
+        </view>
+      </view>
+      <view class="store-follow">
+        <button
+          a:if="{{storeInfo.exclusiveDealsFlag === 0}}"
+          class="store-follow__btn font-montserrat"
+          onTap="openConsentDrawer"
+          size="default"
+          type="primary"
+        >
+          Add to your world
+        </button>
+      </view>
+      <view class="store-market flex">
+        <view class="store-ad-module">
+          <block a:if="{{adList.length}}">
+            <view
+              a:for="{{adList}}"
+              a:for-item="ad"
+              class="store-ad flex"
+              a:key="uuid"
+            >
+              <image class="store-ad-logo" mode="scaleToFill" src="/assets/images/store_default_logo.png" />
+              <view class="store-ad-context line-clamp-2">{{ad.text}}</view>
+              <view class="store-ad-action flex">
+                <image
+                  class="store-ad-action__image"
+                  mode="scaleToFill"
+                  src="/packageStorefront/assets/icons/check_7F8FAB.svg"
+                />
+              </view>
+            </view>
+          </block>
+        </view>
+        <!-- Store offers -->
+        <block a:if="{{storeInfo.coupons.length}}">
+          <market-head title="Offers" titleIcon="/packageStorefront/assets/icons/tag_272727.svg" />
+          <view class="store-market-item">
+            <swiper
+              class="store-market-item-swiper"
+              current="{{couponSwiperActiveIndex}}"
+              onChange="onCouponSwiperChange"
+            >
+              <swiper-item
+                a:for="{{ storeInfo.coupons }}"
+                a:for-item="coupon"
+                a:key="couponUuid"
+              >
+                <coupon
+                  dataSource="{{coupon}}"
+                  onContainerTap="handleCouponContainer"
+                  onAction="hanldeCouponAction"
+                />
+              </swiper-item>
+            </swiper>
+            <swiper-dots activeIndex="{{couponSwiperActiveIndex}}" dots="{{storeInfo.coupons}}" />
+          </view>
+        </block>
+        <!-- Products -->
+        <block a:if="{{productsList.length}}">
+          <market-head title="Products&Services" titleIcon="/packageStorefront/assets/icons/handshake_282930.svg" />
+          <view class="store-market-item">
+            <swiper
+              class="store-market-item-swiper"
+              current="{{productsSwiperActiveIndex}}"
+              onChange="onProductsSwiperChange"
+            >
+              <swiper-item
+                a:for="{{ productsList }}"
+                a:for-index="productsIndex"
+                a:for-item="products"
+                key="{{productsIndex}}"
+              >
+                <view class="store-products grid">
+                  <product
+                    a:for="{{ products }}"
+                    a:for-item="product"
+                    dataSource="{{product}}"
+                    a:key="uuid"
+                  />
+                </view>
+              </swiper-item>
+            </swiper>
+            <swiper-dots
+              activeIndex="{{productsSwiperActiveIndex}}"
+              dots="{{productsList}}"
+            />
+          </view>
+        </block>
+      </view>
+    </view>
+    <consent-drawer ref="createConsentDrawerRef" onClose="handleConsentDrawerClose" />
+  </block>
+</ant-page>

@@ -1,0 +1,9 @@
+# Lambda-specific dependencies.
+# boto3/botocore are pre-installed in the Lambda Python runtime — do NOT bundle them.
+# strands-agents, fastapi, uvicorn are NOT needed in the Lambda path.
+# coloraide: needed by token_mapper and zone_tour_flow (via color_engine).
+# pydantic: pulled in by bedrock-agentcore; also used by style_tokens.
+bedrock-agentcore==1.6.2
+playwright==1.58.0
+coloraide==8.8.1
+aws-lambda-powertools[tracer]==3.29.0
