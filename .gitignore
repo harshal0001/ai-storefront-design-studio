@@ -56,8 +56,6 @@ Thumbs.db
 *.mov
 *.wmv
 
-CLAUDE.md
-
 # OpenTofu / Terraform
 *.tfstate
 *.tfstate.backup
